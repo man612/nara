@@ -1,0 +1,398 @@
+import { describe, expect, it } from "vitest";
+import type {
+  AudioCodecFactory,
+  AudioCodecSession,
+  AudioCodecSessionConfig
+} from "../src/audio/codec.js";
+import type {
+  AudioChunk,
+  VoiceEventHandler,
+  VoiceProvider,
+  VoiceSession,
+  VoiceSessionEvent
+} from "../src/contracts/providers.js";
+import { FirmwareVoiceBridge } from "../src/device/voice-bridge.js";
+import type {
+  FirmwareSessionInfo,
+  FirmwareSessionTransport
+} from "../src/gateway.js";
+
+class FakeCodecSession implements AudioCodecSession {
+  readonly decoded: Uint8Array[] = [];
+  readonly encoded: AudioChunk[] = [];
+  resetCalls = 0;
+  flushCalls = 0;
+  closed = false;
+
+  async decodeUplink(packet: Uint8Array): Promise<AudioChunk> {
+    this.decoded.push(packet.slice());
+    return {
+      format: "pcm16le",
+      data: Uint8Array.from([1, 0, 2, 0]),
+      sampleRate: 16000,
+      channels: 1
+    };
+  }
+
+  async encodeDownlink(chunk: AudioChunk): Promise<Uint8Array[]> {
+    this.encoded.push({
+      ...chunk,
+      data: chunk.data.slice()
+    });
+    return [Uint8Array.from([0xaa, chunk.data[0] ?? 0])];
+  }
+
+  async flushDownlink(): Promise<Uint8Array[]> {
+    this.flushCalls += 1;
+    return [];
+  }
+
+  async resetDownlink(): Promise<void> {
+    this.resetCalls += 1;
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
+}
+
+class FakeCodecFactory implements AudioCodecFactory {
+  readonly session = new FakeCodecSession();
+  config: AudioCodecSessionConfig | null = null;
+
+  async createSession(config: AudioCodecSessionConfig): Promise<AudioCodecSession> {
+    this.config = config;
+    return this.session;
+  }
+}
+
+class FakeVoiceSession implements VoiceSession {
+  readonly handlers = new Set<VoiceEventHandler>();
+  readonly input: AudioChunk[] = [];
+  interruptCalls = 0;
+  streamEndCalls = 0;
+  closed = false;
+
+  async sendAudio(chunk: AudioChunk): Promise<void> {
+    this.input.push({
+      ...chunk,
+      data: chunk.data.slice()
+    });
+  }
+
+  async endAudioStream(): Promise<void> {
+    this.streamEndCalls += 1;
+  }
+
+  async interrupt(): Promise<void> {
+    this.interruptCalls += 1;
+  }
+
+  subscribe(handler: VoiceEventHandler): () => void {
+    this.handlers.add(handler);
+    return () => this.handlers.delete(handler);
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
+
+  async emit(event: VoiceSessionEvent): Promise<void> {
+    for (const handler of [...this.handlers]) {
+      await handler(event);
+    }
+  }
+}
+
+class FakeVoiceProvider implements VoiceProvider {
+  readonly id = "fake";
+  readonly session = new FakeVoiceSession();
+
+  async connect(): Promise<VoiceSession> {
+    return this.session;
+  }
+}
+
+function createFirmwareSession(): FirmwareSessionInfo {
+  return {
+    sessionId: "session-1",
+    protocolVersion: 2,
+    hello: {
+      type: "hello",
+      version: 2,
+      transport: "websocket",
+      audio_params: {
+        format: "opus",
+        sample_rate: 16000,
+        channels: 1,
+        frame_duration: 60
+      }
+    }
+  };
+}
+
+function createTransport() {
+  const log: Array<
+    | { type: "json"; value: unknown }
+    | { type: "audio"; value: Uint8Array }
+  > = [];
+
+  const transport: FirmwareSessionTransport = {
+    playback: {
+      format: "opus",
+      sample_rate: 24000,
+      channels: 1,
+      frame_duration: 60
+    },
+    sendJson(message) {
+      log.push({ type: "json", value: message });
+    },
+    sendAudio(payload) {
+      log.push({ type: "audio", value: payload.slice() });
+    },
+    close() {}
+  };
+
+  return { log, transport };
+}
+
+function providerAudio(value = 7): VoiceSessionEvent {
+  return {
+    type: "audio",
+    chunk: {
+      format: "pcm16le",
+      data: Uint8Array.from([value, 0]),
+      sampleRate: 24000,
+      channels: 1
+    }
+  };
+}
+
+describe("FirmwareVoiceBridge", () => {
+  it("decodes firmware Opus into provider PCM and sends tts start before playback audio", async () => {
+    const codecFactory = new FakeCodecFactory();
+    const voiceProvider = new FakeVoiceProvider();
+    const { log, transport } = createTransport();
+    const bridge = new FirmwareVoiceBridge({
+      codecFactory,
+      voiceProvider
+    });
+
+    const handler = await bridge.createSession(
+      createFirmwareSession(),
+      transport
+    );
+
+    await handler.onAudio({
+      payload: Uint8Array.from([0xf8, 0xff]),
+      timestamp: 123
+    });
+
+    expect(codecFactory.config).toEqual({
+      uplink: {
+        sampleRate: 16000,
+        channels: 1,
+        frameDurationMs: 60
+      },
+      downlink: {
+        sampleRate: 24000,
+        channels: 1,
+        frameDurationMs: 60
+      }
+    });
+    expect(voiceProvider.session.input).toEqual([
+      {
+        format: "pcm16le",
+        data: Uint8Array.from([1, 0, 2, 0]),
+        sampleRate: 16000,
+        channels: 1
+      }
+    ]);
+
+    await voiceProvider.session.emit(providerAudio(9));
+
+    expect(log).toEqual([
+      {
+        type: "json",
+        value: {
+          type: "tts",
+          state: "start",
+          session_id: "session-1"
+        }
+      },
+      {
+        type: "audio",
+        value: Uint8Array.from([0xaa, 9])
+      }
+    ]);
+
+    await voiceProvider.session.emit({ type: "output.completed" });
+
+    expect(log.at(-1)).toEqual({
+      type: "json",
+      value: {
+        type: "tts",
+        state: "stop",
+        session_id: "session-1"
+      }
+    });
+
+    await handler.close();
+  });
+
+  it("maps manual microphone stop to provider audioStreamEnd", async () => {
+    const codecFactory = new FakeCodecFactory();
+    const voiceProvider = new FakeVoiceProvider();
+    const { transport } = createTransport();
+    const bridge = new FirmwareVoiceBridge({
+      codecFactory,
+      voiceProvider
+    });
+    const handler = await bridge.createSession(
+      createFirmwareSession(),
+      transport
+    );
+
+    await handler.onEvent({
+      type: "listen",
+      state: "stop",
+      session_id: "session-1"
+    });
+
+    expect(voiceProvider.session.streamEndCalls).toBe(1);
+    await handler.close();
+  });
+
+  it("stops playback on abort and suppresses stale provider audio until interruption is confirmed", async () => {
+    const codecFactory = new FakeCodecFactory();
+    const voiceProvider = new FakeVoiceProvider();
+    const { log, transport } = createTransport();
+    const bridge = new FirmwareVoiceBridge({
+      codecFactory,
+      voiceProvider
+    });
+    const handler = await bridge.createSession(
+      createFirmwareSession(),
+      transport
+    );
+
+    await voiceProvider.session.emit(providerAudio(1));
+    await handler.onEvent({
+      type: "abort",
+      session_id: "session-1"
+    });
+
+    expect(voiceProvider.session.interruptCalls).toBe(1);
+    expect(codecFactory.session.resetCalls).toBe(1);
+    expect(log.at(-1)).toEqual({
+      type: "json",
+      value: {
+        type: "tts",
+        state: "stop",
+        session_id: "session-1"
+      }
+    });
+
+    const entriesAfterAbort = log.length;
+    await voiceProvider.session.emit(providerAudio(2));
+    expect(log).toHaveLength(entriesAfterAbort);
+
+    await voiceProvider.session.emit({ type: "interrupted" });
+    expect(codecFactory.session.resetCalls).toBe(2);
+
+    await voiceProvider.session.emit(providerAudio(3));
+    expect(log.slice(-2)).toEqual([
+      {
+        type: "json",
+        value: {
+          type: "tts",
+          state: "start",
+          session_id: "session-1"
+        }
+      },
+      {
+        type: "audio",
+        value: Uint8Array.from([0xaa, 3])
+      }
+    ]);
+
+    await handler.close();
+  });
+
+  it("forwards final transcripts, usage and tool calls without leaking provider types into firmware audio", async () => {
+    const codecFactory = new FakeCodecFactory();
+    const voiceProvider = new FakeVoiceProvider();
+    const { log, transport } = createTransport();
+    const usage: unknown[] = [];
+    const tools: unknown[] = [];
+    const bridge = new FirmwareVoiceBridge({
+      codecFactory,
+      voiceProvider,
+      onUsage: (_session, value) => usage.push(value),
+      onToolCall: (_session, value) => tools.push(value)
+    });
+    const handler = await bridge.createSession(
+      createFirmwareSession(),
+      transport
+    );
+
+    await voiceProvider.session.emit({
+      type: "input.transcript",
+      text: "halo nara",
+      final: true
+    });
+    await voiceProvider.session.emit({
+      type: "usage",
+      usage: { totalTokens: 42 }
+    });
+    await voiceProvider.session.emit({
+      type: "tool.call",
+      name: "light",
+      arguments: { on: true },
+      callId: "tool-1"
+    });
+
+    expect(log).toEqual([
+      {
+        type: "json",
+        value: {
+          type: "stt",
+          text: "halo nara",
+          session_id: "session-1"
+        }
+      }
+    ]);
+    expect(usage).toEqual([{ totalTokens: 42 }]);
+    expect(tools).toEqual([
+      {
+        type: "tool.call",
+        name: "light",
+        arguments: { on: true },
+        callId: "tool-1"
+      }
+    ]);
+
+    await handler.close();
+  });
+
+  it("closes both codec and provider session exactly at the firmware boundary", async () => {
+    const codecFactory = new FakeCodecFactory();
+    const voiceProvider = new FakeVoiceProvider();
+    const { transport } = createTransport();
+    const bridge = new FirmwareVoiceBridge({
+      codecFactory,
+      voiceProvider
+    });
+    const handler = await bridge.createSession(
+      createFirmwareSession(),
+      transport
+    );
+
+    await handler.close();
+    await handler.close();
+
+    expect(codecFactory.session.closed).toBe(true);
+    expect(voiceProvider.session.closed).toBe(true);
+    expect(voiceProvider.session.handlers.size).toBe(0);
+  });
+});
