@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Companion Virtual Device</title>
+  <style>
+    :root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0b0c; color: #f5f5f5; }
+    main { width: min(900px, 94vw); display: grid; grid-template-columns: 390px 1fr; gap: 32px; align-items: center; }
+    .device { width: 360px; height: 360px; border-radius: 50%; background: #050505; border: 1px solid #2a2a2d;
+      box-shadow: 0 24px 80px rgba(0,0,0,.5); display: grid; place-items: center; position: relative; overflow: hidden; }
+    .face { width: 250px; height: 170px; position: relative; transition: transform .25s ease; }
+    .eyes { display: flex; justify-content: space-between; position: absolute; width: 100%; top: 32px; }
+    .eye { width: 62px; height: 74px; border: 8px solid #f5f5f5; border-radius: 48%; position: relative; transition: all .2s ease; }
+    .pupil { width: 18px; height: 24px; border-radius: 50%; background: #f5f5f5; position: absolute; left: 14px; top: 17px; transition: transform .15s ease; }
+    .mouth { position: absolute; left: 50%; bottom: 12px; width: 55px; height: 24px; transform: translateX(-50%);
+      border-bottom: 7px solid #f5f5f5; border-radius: 0 0 50px 50px; transition: all .2s ease; }
+    .badge { position: absolute; bottom: 24px; font-size: 12px; color: #8e8e93; letter-spacing: .08em; text-transform: uppercase; }
+    .panel { border: 1px solid #28282b; background: #121214; border-radius: 18px; padding: 22px; }
+    h1 { font-size: 20px; margin: 0 0 6px; } p { color: #a6a6aa; margin: 0 0 20px; line-height: 1.5; }
+    .status { font: 12px ui-monospace, monospace; margin-bottom: 18px; color: #8e8e93; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    button { border: 1px solid #343438; background: #1c1c1f; color: #f5f5f5; padding: 10px 12px; border-radius: 10px; cursor: pointer; }
+    button:hover { background: #29292d; }
+    @media (max-width: 760px) { main { grid-template-columns: 1fr; justify-items: center; } .panel { width: 100%; } }
+  </style>
+</head>
+<body>
+<main>
+  <section class="device">
+    <div class="face" id="face">
+      <div class="eyes"><div class="eye"><i class="pupil"></i></div><div class="eye"><i class="pupil"></i></div></div>
+      <div class="mouth"></div>
+    </div>
+    <div class="badge" id="emotion">neutral</div>
+  </section>
+  <section class="panel">
+    <h1>Virtual Companion Device</h1>
+    <p>Mock untuk Waveshare 1.85B. Mouse/button menggantikan touch, IMU, dan speech events.</p>
+    <div class="status" id="status">connecting…</div>
+    <div class="grid">
+      <button data-event='{"type":"touch","gesture":"tap"}'>Tap</button>
+      <button data-event='{"type":"touch","gesture":"double_tap"}'>Double tap</button>
+      <button data-event='{"type":"touch","gesture":"hold"}'>Hold</button>
+      <button data-event='{"type":"imu","gesture":"shake"}'>Shake</button>
+      <button data-event='{"type":"imu","gesture":"lift"}'>Lift</button>
+      <button data-event='{"type":"imu","gesture":"face_down"}'>Face down</button>
+      <button data-event='{"type":"speech.started"}'>Speech start</button>
+      <button data-event='{"type":"speech.stopped"}'>Speech stop</button>
+    </div>
+  </section>
+</main>
+<script>
+const statusEl = document.querySelector("#status");
+const emotionEl = document.querySelector("#emotion");
+const face = document.querySelector("#face");
+const eyes = [...document.querySelectorAll(".eye")];
+const pupils = [...document.querySelectorAll(".pupil")];
+const mouth = document.querySelector(".mouth");
+const ws = new WebSocket(`ws://${location.host}/device`);
+
+function setEmotion(name, intensity = .6) {
+  emotionEl.textContent = name;
+  face.style.transform = "";
+  eyes.forEach(e => { e.style.height = "74px"; e.style.borderRadius = "48%"; e.style.transform = ""; });
+  mouth.style.width = "55px"; mouth.style.height = "24px"; mouth.style.borderBottomWidth = "7px";
+  if (name === "happy") { eyes.forEach(e => { e.style.height = "36px"; e.style.borderTop = "0"; }); mouth.style.width = "70px"; }
+  if (name === "thinking") { pupils.forEach(p => p.style.transform = "translate(10px,-9px)"); face.style.transform = "rotate(-2deg)"; }
+  else pupils.forEach(p => p.style.transform = "");
+  if (name === "sleepy") eyes.forEach(e => e.style.height = "18px");
+  if (name === "surprised") { eyes.forEach(e => e.style.transform = "scale(1.08)"); mouth.style.width = "30px"; mouth.style.height = "30px"; }
+  if (name === "annoyed") { eyes[0].style.transform = "rotate(8deg)"; eyes[1].style.transform = "rotate(-8deg)"; }
+  face.style.opacity = String(.75 + Math.min(1, intensity) * .25);
+}
+
+ws.onopen = () => {
+  statusEl.textContent = "connected · virtual-device";
+  ws.send(JSON.stringify({ type: "hello", deviceId: "virtual-1", capabilities: ["face","touch","imu","audio-mock"] }));
+};
+ws.onclose = () => statusEl.textContent = "disconnected";
+ws.onmessage = ({ data }) => {
+  const msg = JSON.parse(data);
+  if (msg.type === "gateway.ready") statusEl.textContent = `connected · protocol v${msg.version}`;
+  if (msg.type === "face.set") setEmotion(msg.emotion, msg.intensity);
+  if (msg.type === "face.gaze") pupils.forEach(p => p.style.transform = `translate(${msg.x*12}px,${msg.y*10}px)`);
+};
+document.querySelectorAll("button[data-event]").forEach(btn => btn.onclick = () => {
+  if (ws.readyState === WebSocket.OPEN) ws.send(btn.dataset.event);
+});
+setEmotion("neutral");
+</script>
+</body>
+</html>
