@@ -28,7 +28,7 @@ export interface AudioCodecSession {
    * Discard partial playback PCM after interruption/abort so stale audio cannot
    * leak into the next response.
    */
-  resetDownlink(): void;
+  resetDownlink(): Promise<void>;
 
   close(): Promise<void>;
 }
@@ -39,17 +39,21 @@ export interface AudioCodecFactory {
 
 export interface OpusDecoderPrimitive {
   decode(packet: Uint8Array): Uint8Array;
-  reset?(): void;
-  close?(): void;
+  reset?(): void | Promise<void>;
+  close?(): void | Promise<void>;
 }
 
 export interface OpusEncoderPrimitive {
   encode(pcmFrame: Uint8Array): Uint8Array;
-  reset?(): void;
-  close?(): void;
+  reset?(): void | Promise<void>;
+  close?(): void | Promise<void>;
 }
 
 export interface OpusPrimitiveFactory {
-  createDecoder(format: OpusStreamFormat): OpusDecoderPrimitive;
-  createEncoder(format: OpusStreamFormat): OpusEncoderPrimitive;
+  createDecoder(
+    format: OpusStreamFormat
+  ): OpusDecoderPrimitive | Promise<OpusDecoderPrimitive>;
+  createEncoder(
+    format: OpusStreamFormat
+  ): OpusEncoderPrimitive | Promise<OpusEncoderPrimitive>;
 }
