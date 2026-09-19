@@ -17,7 +17,7 @@ export class RealtimePacketPacer {
   private readonly sendPacket: (packet: Uint8Array) => void;
   private readonly prebufferPackets: number;
   private readonly maxBufferedPackets: number;
-  private readonly onError?: (error: Error) => void;
+  private readonly onError: ((error: Error) => void) | undefined;
   private readonly queue: Uint8Array[] = [];
   private readonly drainWaiters = new Set<() => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
