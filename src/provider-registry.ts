@@ -8,7 +8,6 @@ import { OpenAICompatibleBrain } from "./providers/brain/openai-compatible.js";
 import { GeminiLiveVoiceProvider } from "./providers/voice/gemini-live.js";
 
 function providerApiKey(
-  id: string,
   definition: ProviderDefinition
 ): string | undefined {
   return definition.api_key_env
@@ -25,7 +24,7 @@ function createBrainProvider(id: string, definition: ProviderDefinition): BrainP
     if (!definition.base_url) throw new Error(`Provider ${id} is missing base_url`);
     if (!definition.model) throw new Error(`Provider ${id} is missing model`);
 
-    const apiKey = providerApiKey(id, definition);
+    const apiKey = providerApiKey(definition);
 
     return new OpenAICompatibleBrain({
       id,
@@ -48,7 +47,7 @@ export function createVoiceProvider(
 
   if (definition.adapter === "gemini-live") {
     if (!definition.model) throw new Error(`Provider ${id} is missing model`);
-    const apiKey = providerApiKey(id, definition);
+    const apiKey = providerApiKey(definition);
     if (!apiKey) {
       throw new Error(
         `Provider ${id} is missing API key from ${definition.api_key_env ?? "api_key_env"}`
