@@ -87,6 +87,15 @@ export class Pcm16FrameAccumulator {
     return frames;
   }
 
+  flush(): Uint8Array[] {
+    if (this.pending.byteLength === 0) return [];
+
+    const frame = new Uint8Array(this.frameBytes);
+    frame.set(this.pending, 0);
+    this.pending = new Uint8Array(0);
+    return [frame];
+  }
+
   reset(): void {
     this.pending = new Uint8Array(0);
   }
@@ -132,6 +141,17 @@ export class StreamingOpusCodecSession implements AudioCodecSession {
     this.assertOpen();
     const frames = this.downlinkAccumulator.push(chunk);
     return frames.map((frame) => {
+      const packet = this.encoder.encode(frame);
+      if (packet.byteLength === 0) {
+        throw new Error("Opus encoder returned an empty packet");
+      }
+      return packet;
+    });
+  }
+
+  async flushDownlink(): Promise<Uint8Array[]> {
+    this.assertOpen();
+    return this.downlinkAccumulator.flush().map((frame) => {
       const packet = this.encoder.encode(frame);
       if (packet.byteLength === 0) {
         throw new Error("Opus encoder returned an empty packet");
