@@ -53,6 +53,8 @@ The gateway replies:
 
 The firmware waits for this response before considering the audio channel open.
 
+The two directions are intentionally asymmetric: the device microphone stream is 16 kHz Opus, while the gateway playback stream defaults to 24 kHz. The Waveshare audio codec outputs at 24 kHz, and native-live providers such as Gemini also produce 24 kHz PCM, so this avoids an unnecessary playback resample.
+
 ## Binary Opus framing
 
 The current firmware can speak three compatibility versions:
