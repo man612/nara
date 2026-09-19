@@ -1,0 +1,51 @@
+voice:
+  primary: gemini-live
+  fallbacks:
+    - chained-free
+    - openai-live
+
+brain:
+  primary: deepseek
+  fallbacks:
+    - hermes
+    - openrouter
+
+search:
+  primary: hermes
+  fallbacks:
+    - searxng
+    - ddgs
+
+memory:
+  primary: local
+
+providers:
+  openai-live:
+    kind: voice
+    adapter: openai-live
+    model: gpt-live-1
+
+  gemini-live:
+    kind: voice
+    adapter: gemini-live
+    model: gemini-3.8-live
+
+  chained-free:
+    kind: voice
+    adapter: chained
+    stt: local-whisper
+    tts: edge
+
+  deepseek:
+    kind: brain
+    adapter: openai-compatible
+    base_url: https://api.deepseek.com
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+
+  hermes:
+    kind: brain
+    adapter: openai-compatible
+    base_url: http://127.0.0.1:8642/v1
+    model: hermes
+    api_key_env: HERMES_API_KEY
