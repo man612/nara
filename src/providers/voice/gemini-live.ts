@@ -226,8 +226,9 @@ class GeminiLiveVoiceSession implements VoiceSession {
     this.assertOpen();
     // With automatic activity detection, Gemini's documented barge-in path is
     // the start of the next user activity. There is no separate cancel message
-    // we can send without changing the conversation semantics.
-    await this.emit({ type: "interrupted" });
+    // we can send without changing the conversation semantics. Do not emit a
+    // synthetic interruption here: consumers must wait for the server's real
+    // interrupted event so stale output can be suppressed safely.
   }
 
   async close(): Promise<void> {
