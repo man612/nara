@@ -13,6 +13,8 @@ Read this before broad code search.
 ## Device edge
 
 - `src/device/firmware-wire.ts` — physical firmware hello/auth helpers and WebSocket Opus v1/v2/v3 framing.
+- `src/audio/codec.ts` — stable session-scoped audio codec interfaces.
+- `src/audio/streaming-opus.ts` — PCM16 frame accumulation and provider↔device streaming codec glue.
 - `docs/DEVICE_PROTOCOL.md` — stable firmware↔gateway wire contract and compatibility notes.
 - `virtual-device/index.html` — lightweight semantic protocol/dev console; it is not a binary-audio firmware emulator.
 
@@ -43,6 +45,7 @@ Read this before broad code search.
 
 - `docs/ARCHITECTURE.md` — system boundaries.
 - `docs/DEVICE_PROTOCOL.md` — physical firmware transport.
+- `docs/AUDIO_CODEC.md` — Opus/PCM boundary, buffering, interruption, and implementation replacement.
 - `docs/PROVIDERS.md` — provider strategy.
 - `docs/VOICE_RUNTIME.md` — realtime voice/runtime choices.
 - `docs/COST_EFFICIENCY.md` — token/API cost rules.
@@ -53,6 +56,7 @@ Read this before broad code search.
 - `tests/device-contracts.test.ts`
 - `tests/firmware-wire.test.ts`
 - `tests/gateway-firmware.integration.test.ts`
+- `tests/audio-codec.test.ts`
 - `tests/provider-contracts.test.ts`
 - `tests/provider-config.test.ts`
 - `tests/provider-usage.test.ts`
