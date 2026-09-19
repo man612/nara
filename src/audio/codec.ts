@@ -25,6 +25,12 @@ export interface AudioCodecSession {
   encodeDownlink(chunk: AudioChunk): Promise<Uint8Array[]>;
 
   /**
+   * Finish the current playback stream. Any PCM shorter than one device frame
+   * is padded with silence so the audible tail is not dropped.
+   */
+  flushDownlink(): Promise<Uint8Array[]>;
+
+  /**
    * Discard partial playback PCM after interruption/abort so stale audio cannot
    * leak into the next response.
    */

@@ -13,6 +13,8 @@ Read this before broad code search.
 ## Device edge
 
 - `src/device/firmware-wire.ts` — physical firmware hello/auth helpers and WebSocket Opus v1/v2/v3 framing.
+- `src/device/audio-pacer.ts` — bounded 60 ms playback pacing with a short prebuffer.
+- `src/device/voice-bridge.ts` — per-device firmware ↔ codec ↔ VoiceSession lifecycle bridge.
 - `src/audio/codec.ts` — stable session-scoped audio codec interfaces.
 - `src/audio/streaming-opus.ts` — PCM16 frame accumulation and provider↔device streaming codec glue.
 - `src/audio/libopus-wasm.ts` — first production Opus primitive implementation; package/platform details stay behind the codec boundary.
@@ -61,6 +63,9 @@ Read this before broad code search.
 - `tests/audio-codec.test.ts`
 - `tests/libopus-wasm.test.ts`
 - `tests/gemini-live.test.ts`
+- `tests/audio-pacer.test.ts`
+- `tests/voice-bridge.test.ts`
+- `tests/firmware-voice.integration.test.ts`
 - `tests/provider-contracts.test.ts`
 - `tests/provider-config.test.ts`
 - `tests/provider-usage.test.ts`

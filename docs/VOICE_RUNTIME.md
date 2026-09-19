@@ -64,3 +64,63 @@ The core voice contract carries:
 - provider errors
 
 AEC/VAD close to the device and interruption semantics in the voice adapter are both required for natural barge-in.
+
+
+## Physical firmware session bridge
+
+The physical realtime path is now assembled from replaceable boundaries:
+
+```text
+ESP32 microphone
+    |
+    | Opus 16 kHz mono / 60 ms
+    v
+Firmware WebSocket edge
+    |
+    v
+AudioCodecSession
+    |
+    | PCM16LE 16 kHz
+    v
+VoiceSession
+    |
+    | PCM16LE 24 kHz
+    v
+AudioCodecSession
+    |
+    | Opus 24 kHz mono / 60 ms
+    v
+RealtimePacketPacer
+    |
+    v
+ESP32 speaker
+```
+
+`FirmwareVoiceBridge` owns one codec session and one voice-provider session per physical WebSocket connection. Neither object is shared across devices.
+
+The gateway serializes device messages per connection. This matters because a binary audio frame arriving immediately after hello must not overtake asynchronous provider/session initialization, and an abort must not race an earlier audio frame.
+
+Provider output is also consumed serially. Playback starts only when the first complete Opus packet exists, then the bridge sends the firmware compatibility `tts/start` state before binary audio.
+
+At normal turn completion, partial PCM is zero-padded to a final device frame, the gateway pacing queue drains, and then `tts/stop` is sent.
+
+At local interruption, queued playback is dropped immediately and the encoder state is reset. With providers that use automatic VAD, stale output from the old generation is suppressed until the provider confirms interruption or the old generation completes. This prevents a late packet from re-entering speaking state after the user has already interrupted.
+
+A manual microphone stop uses the optional provider-neutral `VoiceSession.endAudioStream()` capability. Providers that do not need it can omit it.
+
+## Runtime configuration
+
+Physical voice is enabled when `PROVIDERS_FILE` is set. The runtime loads the configured primary voice provider, creates the codec factory, and attaches the bridge to physical firmware sessions.
+
+Without `PROVIDERS_FILE`, Nara still starts in edge-only development mode: health checks and the virtual device remain available, but physical firmware audio is not connected to an AI provider.
+
+For the example configuration:
+
+```bash
+cp config/providers.example.yaml config/providers.local.yaml
+export PROVIDERS_FILE=config/providers.local.yaml
+export GEMINI_API_KEY=...
+pnpm start
+```
+
+Provider changes remain configuration-only. The firmware bridge only knows the `VoiceProvider` / `VoiceSession` contracts.

@@ -43,4 +43,8 @@ Nara does not assume a permanent host. It can run on a laptop, home server, gene
 
 ## Status
 
-The virtual device, semantic device protocol, provider contracts, configurable brain fallback chain, deployment skeleton, and hardware-independent firmware boundary are in place. Next milestones are production voice adapters, memory/search adapters, and the portable face engine.
+The physical realtime voice path is now wired end-to-end at the gateway layer: firmware Opus framing, session-scoped Opus/PCM transcoding, a resumable Gemini Live adapter, bounded device playback pacing, interruption handling, and provider-neutral session lifecycle are implemented and covered by a real-Opus WebSocket integration test.
+
+The standalone firmware also has the portable Nara face engine integrated into the Waveshare runtime.
+
+Next milestones are hardware-in-the-loop voice validation, tool execution from realtime provider calls, additional voice adapters/fallbacks, and memory/search integration.

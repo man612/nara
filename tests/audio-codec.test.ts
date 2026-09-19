@@ -124,6 +124,20 @@ describe("PCM frame accumulator", () => {
     expect(accumulator.pendingBytes).toBe(0);
   });
 
+  it("pads a final partial device frame with silence on flush", () => {
+    const accumulator = new Pcm16FrameAccumulator(config.downlink);
+
+    expect(accumulator.push(pcmChunk(960, 6))).toHaveLength(0);
+
+    const frames = accumulator.flush();
+    expect(frames).toHaveLength(1);
+    expect(frames[0]?.byteLength).toBe(2880);
+    expect(frames[0]?.slice(0, 960)).toEqual(new Uint8Array(960).fill(6));
+    expect(frames[0]?.slice(960)).toEqual(new Uint8Array(1920));
+    expect(accumulator.pendingBytes).toBe(0);
+    expect(accumulator.flush()).toEqual([]);
+  });
+
   it("rejects mismatched and partial PCM frames", () => {
     const accumulator = new Pcm16FrameAccumulator(config.downlink);
 
@@ -178,6 +192,26 @@ describe("streaming Opus codec session", () => {
     expect(primitives.encoders).toHaveLength(2);
     expect(primitives.encoders[0]?.frames).toHaveLength(1);
     expect(primitives.encoders[1]?.frames).toHaveLength(1);
+  });
+
+  it("encodes a padded tail when the provider turn completes", async () => {
+    const primitives = new FakePrimitiveFactory();
+    const factory = new StreamingOpusCodecFactory(primitives);
+    const session = await factory.createSession(config);
+
+    expect(await session.encodeDownlink(pcmChunk(960, 3))).toHaveLength(0);
+    const packets = await session.flushDownlink();
+
+    expect(packets).toEqual([Uint8Array.from([3, 0])]);
+    expect(primitives.encoders[0]?.frames[0]?.byteLength).toBe(2880);
+    expect(primitives.encoders[0]?.frames[0]?.slice(0, 960)).toEqual(
+      new Uint8Array(960).fill(3)
+    );
+    expect(primitives.encoders[0]?.frames[0]?.slice(960)).toEqual(
+      new Uint8Array(1920)
+    );
+
+    await session.close();
   });
 
   it("drops partial playback after interruption and closes native state once", async () => {

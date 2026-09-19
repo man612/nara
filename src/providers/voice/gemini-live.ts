@@ -154,6 +154,8 @@ class GeminiLiveVoiceSession implements VoiceSession {
   private resumptionHandle: string | null = null;
   private reconnectRequested = false;
   private closed = false;
+  private outputActive = false;
+  private serverEventChain: Promise<void> = Promise.resolve();
   private readonly outbox: string[] = [];
 
   private constructor(options: GeminiLiveOptions) {
@@ -211,12 +213,22 @@ class GeminiLiveVoiceSession implements VoiceSession {
     this.sendJson({ realtimeInput: { text } });
   }
 
+  async endAudioStream(): Promise<void> {
+    this.assertOpen();
+    this.sendJson({
+      realtimeInput: {
+        audioStreamEnd: true
+      }
+    });
+  }
+
   async interrupt(): Promise<void> {
     this.assertOpen();
     // With automatic activity detection, Gemini's documented barge-in path is
     // the start of the next user activity. There is no separate cancel message
-    // we can send without changing the conversation semantics.
-    await this.emit({ type: "interrupted" });
+    // we can send without changing the conversation semantics. Do not emit a
+    // synthetic interruption here: consumers must wait for the server's real
+    // interrupted event so stale output can be suppressed safely.
   }
 
   async close(): Promise<void> {
@@ -311,7 +323,17 @@ class GeminiLiveVoiceSession implements VoiceSession {
           resolve();
         }
 
-        void this.handleServerMessage(message);
+        this.serverEventChain = this.serverEventChain
+          .then(() => this.handleServerMessage(message))
+          .catch(async (error) => {
+            await this.emit({
+              type: "error",
+              message:
+                error instanceof Error
+                  ? `Gemini message handling failed: ${error.message}`
+                  : "Gemini message handling failed"
+            });
+          });
       });
 
       socket.on("error", (error) => {
@@ -395,7 +417,13 @@ class GeminiLiveVoiceSession implements VoiceSession {
 
     const content = message.serverContent;
     if (content) {
-      for (const part of content.modelTurn?.parts ?? []) {
+      const modelParts = content.modelTurn?.parts ?? [];
+      if (modelParts.length > 0 && !this.outputActive) {
+        this.outputActive = true;
+        await this.emit({ type: "output.started" });
+      }
+
+      for (const part of modelParts) {
         const inline = part.inlineData;
         if (!inline?.data) continue;
 
@@ -433,7 +461,11 @@ class GeminiLiveVoiceSession implements VoiceSession {
         });
       }
       if (content.interrupted) {
+        this.outputActive = false;
         await this.emit({ type: "interrupted" });
+      } else if (content.turnComplete && this.outputActive) {
+        this.outputActive = false;
+        await this.emit({ type: "output.completed" });
       }
     }
 
