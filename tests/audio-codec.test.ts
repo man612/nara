@@ -186,7 +186,7 @@ describe("streaming Opus codec session", () => {
     const session = await factory.createSession(config);
 
     expect(await session.encodeDownlink(pcmChunk(1920, 4))).toHaveLength(0);
-    session.resetDownlink();
+    await session.resetDownlink();
 
     // If reset worked, a fresh 20 ms must not complete the discarded 40 ms.
     expect(await session.encodeDownlink(pcmChunk(960, 5))).toHaveLength(0);
