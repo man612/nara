@@ -1,12 +1,18 @@
+export type Interaction =
+  | "idle"
+  | "listening"
+  | "thinking"
+  | "speaking"
+  | "sleeping"
+  | "error";
+
 export type Emotion =
   | "neutral"
   | "happy"
   | "sad"
   | "shy"
   | "annoyed"
-  | "surprised"
-  | "sleepy"
-  | "thinking";
+  | "surprised";
 
 export type DeviceEvent =
   | { type: "hello"; deviceId: string; capabilities?: string[] }
@@ -15,8 +21,24 @@ export type DeviceEvent =
   | { type: "speech.started" }
   | { type: "speech.stopped" };
 
+export type FaceSetCommand =
+  | {
+      type: "face.set";
+      interaction: Interaction;
+      emotion?: Emotion;
+      intensity?: number;
+      durationMs?: number;
+    }
+  | {
+      type: "face.set";
+      interaction?: Interaction;
+      emotion: Emotion;
+      intensity?: number;
+      durationMs?: number;
+    };
+
 export type DeviceCommand =
-  | { type: "face.set"; emotion: Emotion; intensity?: number; durationMs?: number }
+  | FaceSetCommand
   | { type: "face.gaze"; x: number; y: number }
   | { type: "audio.interrupt" }
   | { type: "device.sleep" }
