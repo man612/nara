@@ -140,18 +140,20 @@ export class StreamingOpusCodecSession implements AudioCodecSession {
     });
   }
 
-  resetDownlink(): void {
+  async resetDownlink(): Promise<void> {
     this.assertOpen();
     this.downlinkAccumulator.reset();
-    this.encoder.reset?.();
+    await this.encoder.reset?.();
   }
 
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
     this.downlinkAccumulator.reset();
-    this.decoder.close?.();
-    this.encoder.close?.();
+    await Promise.all([
+      this.decoder.close?.(),
+      this.encoder.close?.()
+    ]);
   }
 
   private assertOpen(): void {
@@ -170,10 +172,11 @@ export class StreamingOpusCodecFactory implements AudioCodecFactory {
     assertFormat(config.uplink, "Opus uplink");
     assertFormat(config.downlink, "Opus downlink");
 
-    return new StreamingOpusCodecSession(
-      config,
+    const [decoder, encoder] = await Promise.all([
       this.primitives.createDecoder(config.uplink),
       this.primitives.createEncoder(config.downlink)
-    );
+    ]);
+
+    return new StreamingOpusCodecSession(config, decoder, encoder);
   }
 }
