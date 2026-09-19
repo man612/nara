@@ -128,6 +128,13 @@ describe("Gemini Live provider", () => {
         }
       });
 
+      await session.endAudioStream?.();
+      expect(JSON.parse(socket.sent.at(-1)!)).toEqual({
+        realtimeInput: {
+          audioStreamEnd: true
+        }
+      });
+
       await expect(
         session.sendAudio({
           format: "pcm16le",
@@ -192,6 +199,7 @@ describe("Gemini Live provider", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
+      expect(events).toContainEqual({ type: "output.started" });
       expect(events).toContainEqual({
         type: "audio",
         chunk: {
@@ -233,6 +241,51 @@ describe("Gemini Live provider", () => {
         arguments: { on: true },
         callId: "call-1"
       });
+    } finally {
+      unsubscribe();
+      await session.close();
+    }
+  });
+
+  it("emits a provider-neutral completion after the model turn ends", async () => {
+    const harness = createHarness();
+    const { session, socket } = await connectHarness(
+      harness.factory,
+      harness.sockets
+    );
+    const events: VoiceSessionEvent[] = [];
+    const unsubscribe = session.subscribe((event) => {
+      events.push(event);
+    });
+
+    try {
+      socket.message({
+        serverContent: {
+          modelTurn: {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: "audio/pcm;rate=24000",
+                  data: Buffer.from([1, 0, 2, 0]).toString("base64")
+                }
+              }
+            ]
+          }
+        }
+      });
+      socket.message({
+        serverContent: {
+          turnComplete: true
+        }
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(events.map((event) => event.type)).toEqual([
+        "output.started",
+        "audio",
+        "output.completed"
+      ]);
     } finally {
       unsubscribe();
       await session.close();
