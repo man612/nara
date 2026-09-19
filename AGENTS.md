@@ -9,6 +9,7 @@ Build a provider-agnostic core for physical AI companions. No character, vendor,
 - Never put third-party API keys in ESP32 firmware.
 - Keep low-latency audio transport separate from slow agent/tool work.
 - Hermes may be an optional brain/tool backend, not a required runtime.
+- SumoPod, generic VPSes, home servers, and managed containers are deployment targets only; never couple application logic to a host.
 - Prefer one OpenAI-compatible brain adapter for DeepSeek, OpenRouter, Hermes, vLLM, Ollama and similar endpoints.
 - Device messages must be versioned and hardware-neutral.
 - Hardware-specific behavior belongs in firmware, not this repo.

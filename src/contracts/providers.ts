@@ -35,9 +35,23 @@ export interface MemoryProvider {
   recall(namespace: string, query: string, limit?: number): Promise<string[]>;
 }
 
+export type VoiceSessionEvent =
+  | { type: "audio"; chunk: AudioChunk }
+  | { type: "input.transcript"; text: string; final: boolean }
+  | { type: "output.transcript"; text: string; final: boolean }
+  | { type: "speech.started" }
+  | { type: "speech.stopped" }
+  | { type: "interrupted" }
+  | { type: "tool.call"; name: string; arguments: unknown; callId?: string }
+  | { type: "error"; message: string };
+
+export type VoiceEventHandler = (event: VoiceSessionEvent) => void | Promise<void>;
+
 export interface VoiceSession {
   sendAudio(chunk: AudioChunk): Promise<void>;
+  sendText?(text: string): Promise<void>;
   interrupt(): Promise<void>;
+  subscribe(handler: VoiceEventHandler): () => void;
   close(): Promise<void>;
 }
 

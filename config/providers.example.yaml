@@ -23,12 +23,12 @@ providers:
   openai-live:
     kind: voice
     adapter: openai-live
-    model: gpt-live-1
+    model: ${OPENAI_LIVE_MODEL:-gpt-live-1}
 
   gemini-live:
     kind: voice
     adapter: gemini-live
-    model: gemini-3.8-live
+    model: ${GEMINI_LIVE_MODEL:-gemini-3.8-live}
 
   chained-free:
     kind: voice
@@ -39,13 +39,20 @@ providers:
   deepseek:
     kind: brain
     adapter: openai-compatible
-    base_url: https://api.deepseek.com
-    model: deepseek-flash
+    base_url: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+    model: ${DEEPSEEK_MODEL:-deepseek-flash}
     api_key_env: DEEPSEEK_API_KEY
 
   hermes:
     kind: brain
     adapter: openai-compatible
-    base_url: http://127.0.0.1:8642/v1
-    model: hermes
+    base_url: ${HERMES_BASE_URL:-http://127.0.0.1:8642/v1}
+    model: ${HERMES_MODEL:-hermes}
     api_key_env: HERMES_API_KEY
+
+  openrouter:
+    kind: brain
+    adapter: openai-compatible
+    base_url: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+    model: ${OPENROUTER_MODEL:-openrouter/auto}
+    api_key_env: OPENROUTER_API_KEY

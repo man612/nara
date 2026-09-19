@@ -33,8 +33,8 @@ The real-time voice path stays thin. Slow web search, browser work, long reasoni
 - Agent/tools: Hermes Agent is optional and can run on a VPS.
 - Search: Hermes, SearXNG, DDGS, Brave, or provider-native search.
 - Memory: start local; PostgreSQL/pgvector can be added for deployment.
-- Device: first target is Waveshare ESP32-S3-Touch-LCD-1.85B through the companion-firmware fork.
+- Device: first target is Waveshare ESP32-S3-Touch-LCD-1.85B through the standalone `companion-firmware` repository.
 
 ## Status
 
-Early scaffold. Next milestone: a virtual device for face states, touch/IMU events, audio interruption and provider routing without hardware.
+The virtual device, semantic device protocol, provider contracts, configurable brain fallback chain, and deployment skeleton are in place. Next milestones are the real Gemini/GPT-Live adapters, chained voice, memory/search adapters, and the portable face engine.
