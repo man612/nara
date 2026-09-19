@@ -53,10 +53,23 @@ On barge-in, abort, provider interruption, or a new response replacing the old o
 
 The native/WASM package that implements `OpusDecoderPrimitive` and `OpusEncoderPrimitive` is replaceable. The first production implementation should be selected by platform coverage, maintenance, correctness tests, deployment behavior, and measured latency rather than package popularity alone.
 
-The current candidate research includes:
+The first production implementation is pinned to `libopus-wasm@0.4.0`.
 
-- `libopus-node`: modern N-API wrapper, extensive platform CI including Linux glibc/musl x64+arm64, but still a young package.
-- `@discordjs/opus`: mature and widely deployed native libopus wrapper with Node >=20 support and prebuilt releases.
-- WASM implementations: useful fallback when native deployment is undesirable, but should be benchmarked under Nara's actual 16/24 kHz mono workload.
+Why it is the initial default:
 
-Keep the dependency behind this interface so changing the implementation never affects firmware or provider contracts.
+- it ships one self-contained WASM-backed ES module and needs no node-gyp or platform-specific native prebuild;
+- it supports Nara's required 16 kHz and 24 kHz mono streams plus 60 ms encode frames;
+- version 0.4.0 specifically fixed WASM stack sizing for 40/60 ms frames;
+- the upstream release verifies Node 22/24/26 and hundreds of codec combinations;
+- its upstream benchmark is close to `@discordjs/opus` native performance on the tested workload, although that benchmark is not a portable guarantee;
+- Nara's production image is Node 24 Alpine, so avoiding a glibc/musl native-binary split materially simplifies deployment.
+
+Other implementations remain useful comparison/fallback candidates:
+
+- `libopus-node`: modern N-API wrapper with strong Linux glibc/musl x64+arm64 CI, but still a young package;
+- `@discordjs/opus`: mature and widely deployed native libopus wrapper;
+- other WASM/native implementations can be benchmarked under Nara's actual 16/24 kHz mono workload.
+
+Nara CI also builds the real Node 24 Alpine production image and performs an Opus encode/decode smoke test inside it.
+
+Keep all of these behind `AudioCodecSession` so changing the implementation never affects firmware or provider contracts.

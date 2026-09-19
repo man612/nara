@@ -20,3 +20,37 @@ jobs:
       - run: pnpm run check
       - run: pnpm test
       - run: pnpm run build
+
+  production-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build Node 24 Alpine image
+        run: docker build -t nara-ci .
+      - name: Smoke-test Opus WASM in production image
+        run: |
+          docker run --rm --entrypoint node nara-ci --input-type=module -e '
+            import { createEncoder, createDecoder } from "libopus-wasm";
+            const encoder = await createEncoder({
+              sampleRate: 24000,
+              channels: 1,
+              frameSize: 1440
+            });
+            const decoder = await createDecoder({
+              sampleRate: 24000,
+              channels: 1,
+              maxFrameSize: 2880
+            });
+            const pcm = new Int16Array(1440);
+            for (let i = 0; i < pcm.length; i += 1) {
+              pcm[i] = Math.round(Math.sin((2 * Math.PI * 440 * i) / 24000) * 12000);
+            }
+            const packet = encoder.encode(pcm);
+            const decoded = decoder.decode(packet);
+            if (packet.byteLength === 0 || decoded.length !== 1440) {
+              throw new Error("Opus production-image smoke test failed");
+            }
+            encoder.free();
+            decoder.free();
+            console.log("Opus WASM production-image smoke test passed");
+          '
