@@ -14,9 +14,19 @@ export type BrainRequest = {
   tools?: unknown[];
 };
 
+export type ProviderUsage = {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  cachedInputTokens?: number;
+  uncachedInputTokens?: number;
+};
+
 export type BrainResponse = {
   text: string;
   toolCalls?: unknown[];
+  providerId?: string;
+  usage?: ProviderUsage;
 };
 
 export interface BrainProvider {
@@ -43,6 +53,7 @@ export type VoiceSessionEvent =
   | { type: "speech.stopped" }
   | { type: "interrupted" }
   | { type: "tool.call"; name: string; arguments: unknown; callId?: string }
+  | { type: "usage"; usage: ProviderUsage }
   | { type: "error"; message: string };
 
 export type VoiceEventHandler = (event: VoiceSessionEvent) => void | Promise<void>;
