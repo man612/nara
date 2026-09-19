@@ -50,6 +50,8 @@ export type VoiceSessionEvent =
   | { type: "audio"; chunk: AudioChunk }
   | { type: "input.transcript"; text: string; final: boolean }
   | { type: "output.transcript"; text: string; final: boolean }
+  | { type: "output.started" }
+  | { type: "output.completed" }
   | { type: "speech.started" }
   | { type: "speech.stopped" }
   | { type: "interrupted" }
@@ -62,6 +64,12 @@ export type VoiceEventHandler = (event: VoiceSessionEvent) => void | Promise<voi
 export interface VoiceSession {
   sendAudio(chunk: AudioChunk): Promise<void>;
   sendText?(text: string): Promise<void>;
+  /**
+   * Signal that microphone audio has paused/ended while keeping the realtime
+   * session itself open. Providers that use automatic VAD can use this to
+   * finalize a manually stopped utterance without closing the conversation.
+   */
+  endAudioStream?(): Promise<void>;
   interrupt(): Promise<void>;
   subscribe(handler: VoiceEventHandler): () => void;
   close(): Promise<void>;
