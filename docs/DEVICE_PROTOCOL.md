@@ -72,11 +72,27 @@ The gateway parser validates header version/type/length before exposing an Opus 
 Firmware currently sends compatibility messages such as `listen`, `abort`, and `mcp`.
 Firmware currently accepts compatibility messages such as `tts`, `stt`, `llm`, `mcp`, `system`, and `alert`.
 
-These are edge-format details. Nara core should translate them into hardware-neutral semantic events rather than teaching Gemini/GPT/other providers about XiaoZhi-era message names.
+The physical playback lifecycle has one strict ordering rule: the gateway sends `{"type":"tts","state":"start"}` before the first binary playback packet. The current firmware only accepts incoming audio while its state machine is in `Speaking`; sending binary audio first would silently discard it.
+
+At provider turn completion the gateway:
+1. flushes any PCM shorter than one 60 ms device frame by padding the rest with silence;
+2. sends all resulting Opus packets through the playback pacer;
+3. waits until the gateway pacing queue is drained;
+4. sends `{"type":"tts","state":"stop"}`.
+
+The stop message means the gateway has finished transmitting the response. In auto-listening mode the firmware already waits for its local playback queue to drain before re-enabling voice processing, so the gateway does not need to guess physical speaker completion.
+
+For interruption, firmware `abort` immediately clears queued gateway playback, resets the downlink codec state, and receives `tts/stop`. Provider output from the old turn is suppressed until the provider confirms interruption or the old turn naturally completes.
+
+A manual `listen/stop` is translated to the provider-neutral `VoiceSession.endAudioStream()`. Gemini maps that to `realtimeInput.audioStreamEnd=true`, which is the documented signal for a microphone stream ending while automatic activity detection remains enabled.
+
+These are edge-format details. Nara core translates them into hardware-neutral session events rather than teaching Gemini/GPT/other providers about XiaoZhi-era message names.
 
 ## Frame duration
 
 The first hardware baseline stays at 60 ms because that is what the current firmware encoder and queues already use.
+
+Playback is rate-controlled because the firmware decode queue is deliberately small. Nara currently follows the proven compatibility pattern of sending the first five 60 ms packets immediately as a short prebuffer and then pacing remaining packets at one packet per 60 ms. This prevents a realtime provider that generates faster than playback speed from flooding the ESP32 decode queue.
 
 Opus supports shorter frames and RFC 6716 notes that 20 ms is a good general choice for interactive applications. Nara should benchmark 20/40/60 ms end-to-end after the voice path is functional rather than changing packetization during the transport bring-up.
 
