@@ -1,10 +1,10 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { WebSocketServer } from "ws";
-import type { RawData, VerifyClientInfo } from "ws";
+import type { RawData } from "ws";
 import type { DeviceCommand, DeviceEvent } from "./contracts/device.js";
 import {
   createFirmwareServerHello,
@@ -58,7 +58,7 @@ const server = createServer(async (req, res) => {
 const wss = new WebSocketServer({
   server,
   path: "/device",
-  verifyClient: (info: VerifyClientInfo) =>
+  verifyClient: (info: { req: IncomingMessage }) =>
     isDeviceAuthorized(info.req.headers.authorization, deviceToken)
 });
 
