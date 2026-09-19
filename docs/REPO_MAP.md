@@ -4,17 +4,24 @@ Read this before broad code search.
 
 ## Runtime entry
 
-- `src/index.ts` — HTTP/WebSocket gateway bootstrap. Keep it thin.
+- `src/index.ts` — process/bootstrap entry only. Keep it thin.
+- `src/gateway.ts` — HTTP/WebSocket server, firmware/semantic session handshake and device-edge hooks.
 - `src/contracts/device.ts` — hardware-neutral semantic device messages.
 - `src/contracts/providers.ts` — voice/brain/search/memory contracts and normalized usage.
 - `src/provider-registry.ts` — provider construction and fallback composition.
+
+## Device edge
+
+- `src/device/firmware-wire.ts` — physical firmware hello/auth helpers and WebSocket Opus v1/v2/v3 framing.
+- `docs/DEVICE_PROTOCOL.md` — stable firmware↔gateway wire contract and compatibility notes.
+- `virtual-device/index.html` — lightweight semantic protocol/dev console; it is not a binary-audio firmware emulator.
 
 ## Configuration
 
 - `config/providers.example.yaml` — provider routing example.
 - `config/profiles/default.yaml` — generic character profile.
 - `config/profiles/doi.example.yaml` — example partner profile; never make this a core dependency.
-- `.env.example` — server-side secrets and model overrides.
+- `.env.example` — server-side secrets, model overrides, and optional device bearer credential.
 
 ## Providers
 
@@ -24,8 +31,8 @@ Read this before broad code search.
 
 ## Device development
 
-- `virtual-device/index.html` — lightweight protocol/dev console, not the final embedded renderer.
 - Nara's production face renderer belongs in `nara-firmware` and should be simulatable on desktop with LVGL.
+- Keep provider-specific realtime events behind gateway adapters; ESP32 should only know the stable device edge.
 
 ## Deployment
 
@@ -35,6 +42,7 @@ Read this before broad code search.
 ## Focused design docs
 
 - `docs/ARCHITECTURE.md` — system boundaries.
+- `docs/DEVICE_PROTOCOL.md` — physical firmware transport.
 - `docs/PROVIDERS.md` — provider strategy.
 - `docs/VOICE_RUNTIME.md` — realtime voice/runtime choices.
 - `docs/COST_EFFICIENCY.md` — token/API cost rules.
@@ -42,6 +50,9 @@ Read this before broad code search.
 
 ## Tests
 
+- `tests/device-contracts.test.ts`
+- `tests/firmware-wire.test.ts`
+- `tests/gateway-firmware.integration.test.ts`
 - `tests/provider-contracts.test.ts`
 - `tests/provider-config.test.ts`
 - `tests/provider-usage.test.ts`
