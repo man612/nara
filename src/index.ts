@@ -28,11 +28,11 @@ const server = createServer(async (req, res) => {
 
 const wss = new WebSocketServer({ server, path: "/device" });
 
-function sendCommand(socket: Parameters<typeof wss.emit>[1], command: DeviceCommand) {
-  socket.send(JSON.stringify(command));
-}
-
 wss.on("connection", (socket) => {
+  const sendCommand = (command: DeviceCommand) => {
+    socket.send(JSON.stringify(command));
+  };
+
   socket.send(JSON.stringify({ type: "gateway.ready", version: 1 }));
 
   socket.on("message", (raw) => {
@@ -40,7 +40,7 @@ wss.on("connection", (socket) => {
     console.log("[device]", event);
 
     if (event.type === "hello") {
-      sendCommand(socket, {
+      sendCommand({
         type: "face.set",
         interaction: "idle",
         emotion: "happy",
@@ -50,14 +50,14 @@ wss.on("connection", (socket) => {
     }
 
     if (event.type === "speech.started") {
-      sendCommand(socket, {
+      sendCommand({
         type: "face.set",
         interaction: "listening"
       });
     }
 
     if (event.type === "speech.stopped") {
-      sendCommand(socket, {
+      sendCommand({
         type: "face.set",
         interaction: "thinking"
       });
