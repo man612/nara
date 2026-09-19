@@ -66,7 +66,7 @@ export function createFirmwareServerHello(
     session_id: sessionId,
     audio_params: {
       format: "opus",
-      sample_rate: options?.sampleRate ?? 16000,
+      sample_rate: options?.sampleRate ?? 24000,
       channels: 1,
       frame_duration: options?.frameDuration ?? 60
     }
