@@ -53,8 +53,19 @@ class MessageQueue {
 class FakeRealtimeVoiceSession implements VoiceSession {
   private readonly handlers = new Set<VoiceEventHandler>();
   readonly input: AudioChunk[] = [];
-  readonly firstInput = Promise.withResolvers<AudioChunk>();
-  readonly closed = Promise.withResolvers<void>();
+  readonly firstInput: Promise<AudioChunk>;
+  readonly closed: Promise<void>;
+  private resolveFirstInput!: (chunk: AudioChunk) => void;
+  private resolveClosed!: () => void;
+
+  constructor() {
+    this.firstInput = new Promise((resolve) => {
+      this.resolveFirstInput = resolve;
+    });
+    this.closed = new Promise((resolve) => {
+      this.resolveClosed = resolve;
+    });
+  }
 
   async sendAudio(chunk: AudioChunk): Promise<void> {
     const copied = {
@@ -63,7 +74,7 @@ class FakeRealtimeVoiceSession implements VoiceSession {
     };
     this.input.push(copied);
     if (this.input.length === 1) {
-      this.firstInput.resolve(copied);
+      this.resolveFirstInput(copied);
     }
   }
 
@@ -76,7 +87,7 @@ class FakeRealtimeVoiceSession implements VoiceSession {
 
   async close(): Promise<void> {
     this.handlers.clear();
-    this.closed.resolve();
+    this.resolveClosed();
   }
 
   async emit(event: VoiceSessionEvent): Promise<void> {
@@ -207,7 +218,7 @@ describe("firmware realtime voice vertical slice", () => {
         { binary: true }
       );
 
-      const providerInput = await voiceProvider.session.firstInput.promise;
+      const providerInput = await voiceProvider.session.firstInput;
       expect(providerInput.format).toBe("pcm16le");
       expect(providerInput.sampleRate).toBe(16000);
       expect(providerInput.channels).toBe(1);
@@ -252,7 +263,7 @@ describe("firmware realtime voice vertical slice", () => {
         2
       );
 
-      expect(frame2.timestamp - frame1.timestamp).toBe(60);
+      expect((frame2.timestamp - frame1.timestamp) >>> 0).toBe(60);
       expect(frame1.payload.byteLength).toBeGreaterThan(0);
       expect(frame2.payload.byteLength).toBeGreaterThan(0);
 
@@ -272,7 +283,7 @@ describe("firmware realtime voice vertical slice", () => {
       const closed = once(socket, "close");
       socket.close();
       await closed;
-      await voiceProvider.session.closed.promise;
+      await voiceProvider.session.closed;
     } finally {
       uplinkEncoder.free();
       downlinkDecoder.free();
