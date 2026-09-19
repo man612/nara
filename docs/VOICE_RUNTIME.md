@@ -32,9 +32,9 @@ It normally has more latency than native speech-to-speech but gives maximum port
 
 LiveKit Agents can be added as an adapter when WebRTC, browser/mobile clients, telephony or LiveKit infrastructure is useful.
 
-Pipecat can be added as an adapter when its Python realtime pipeline ecosystem is useful, especially for chained STT/LLM/TTS experimentation.
+Pipecat can be added as an adapter when its Python realtime pipeline ecosystem is useful, especially for chained STT/LLM/TTS experimentation. Pipecat also now maintains an ESP32-S3 client SDK using SmallWebRTC; that is a serious optional device-transport candidate, but it must be ported and measured on the Waveshare 1.85B before adoption.
 
-Neither framework is a mandatory dependency of Companion Core. The ESP32 device protocol remains independent from both.
+Neither framework is a mandatory dependency of Companion Core. The device contract remains independent from WebSocket/Opus, SmallWebRTC/Pipecat, and LiveKit.
 
 ## Interruption
 
