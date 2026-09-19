@@ -11,6 +11,9 @@ importers:
       dotenv:
         specifier: ^17.2.2
         version: 17.4.2
+      libopus-wasm:
+        specifier: 0.4.0
+        version: 0.4.0
       ws:
         specifier: ^8.18.3
         version: 8.21.3
@@ -454,6 +457,10 @@ packages:
 
   js-tokens@9.0.1:
     resolution: {integrity: sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ==}
+
+  libopus-wasm@0.4.0:
+    resolution: {integrity: sha512-k7XznZMcDSgIl7uHdiCdIPaPfVLslf3C90jcJIEiC5OLK2Qy+M2CMmeAokDca6bbYRnSCVZ9/sUEOSfDrX60Qw==}
+    engines: {node: '>=22'}
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
@@ -932,6 +939,8 @@ snapshots:
     optional: true
 
   js-tokens@9.0.1: {}
+
+  libopus-wasm@0.4.0: {}
 
   loupe@3.2.1: {}
 
