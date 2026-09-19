@@ -3,15 +3,17 @@ import { createServer } from "node:http";
 import type { IncomingMessage, Server as HttpServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { WebSocketServer } from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 import type { RawData } from "ws";
 import type { DeviceCommand, DeviceEvent } from "./contracts/device.js";
 import {
   createFirmwareServerHello,
   decodeFirmwareAudioFrame,
+  encodeFirmwareAudioFrame,
   isDeviceAuthorized,
   isFirmwareHello,
   type FirmwareAudioFrame,
+  type FirmwareAudioParams,
   type FirmwareHello,
   type FirmwareProtocolVersion
 } from "./device/firmware-wire.js";
@@ -22,6 +24,24 @@ export type FirmwareSessionInfo = {
   hello: FirmwareHello;
 };
 
+export type FirmwareSessionTransport = {
+  readonly playback: FirmwareAudioParams;
+  sendJson(message: unknown): void;
+  sendAudio(payload: Uint8Array): void;
+  close(code?: number, reason?: string): void;
+};
+
+export interface FirmwareSessionHandler {
+  onAudio(frame: FirmwareAudioFrame): void | Promise<void>;
+  onEvent(event: unknown): void | Promise<void>;
+  close(): void | Promise<void>;
+}
+
+export type FirmwareSessionFactory = (
+  session: FirmwareSessionInfo,
+  transport: FirmwareSessionTransport
+) => Promise<FirmwareSessionHandler>;
+
 export type GatewayHooks = {
   onFirmwareAudio?: (
     session: FirmwareSessionInfo,
@@ -31,11 +51,15 @@ export type GatewayHooks = {
     session: FirmwareSessionInfo,
     event: unknown
   ) => void | Promise<void>;
+  onFirmwareClosed?: (
+    session: FirmwareSessionInfo
+  ) => void | Promise<void>;
 };
 
 export type GatewayOptions = {
   deviceToken?: string;
   virtualDeviceHtml?: string;
+  firmwareSessionFactory?: FirmwareSessionFactory;
   hooks?: GatewayHooks;
 };
 
@@ -96,13 +120,57 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
   wss.on("connection", (socket) => {
     const sessionId = randomUUID();
     let firmwareSession: FirmwareSessionInfo | null = null;
+    let firmwareHandler: FirmwareSessionHandler | null = null;
+    let firmwareTransport: FirmwareSessionTransport | null = null;
     let semanticClient = false;
+    let closed = false;
+    let messageChain: Promise<void> = Promise.resolve();
 
     const sendCommand = (command: DeviceCommand) => {
       socket.send(JSON.stringify(command));
     };
 
-    socket.on("message", async (raw, isBinary) => {
+    const createTransport = (
+      session: FirmwareSessionInfo,
+      playback: FirmwareAudioParams
+    ): FirmwareSessionTransport => {
+      let nextTimestamp = Date.now() >>> 0;
+
+      const requireOpen = () => {
+        if (socket.readyState !== WebSocket.OPEN) {
+          throw new Error("Firmware WebSocket is not open");
+        }
+      };
+
+      return {
+        playback,
+        sendJson(message: unknown) {
+          requireOpen();
+          socket.send(JSON.stringify(message));
+        },
+        sendAudio(payload: Uint8Array) {
+          requireOpen();
+          const timestamp = nextTimestamp;
+          nextTimestamp = (nextTimestamp + playback.frame_duration) >>> 0;
+          const framed = encodeFirmwareAudioFrame(
+            payload,
+            session.protocolVersion,
+            timestamp
+          );
+          socket.send(Buffer.from(framed), { binary: true });
+        },
+        close(code = 1000, reason = "session closed") {
+          if (
+            socket.readyState === WebSocket.OPEN ||
+            socket.readyState === WebSocket.CONNECTING
+          ) {
+            socket.close(code, reason.slice(0, 120));
+          }
+        }
+      };
+    };
+
+    const handleMessage = async (raw: RawData, isBinary: boolean) => {
       if (isBinary) {
         if (firmwareSession === null) {
           socket.close(1002, "firmware hello required before binary audio");
@@ -114,6 +182,7 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
             toBytes(raw),
             firmwareSession.protocolVersion
           );
+          await firmwareHandler?.onAudio(frame);
           await options.hooks?.onFirmwareAudio?.(firmwareSession, frame);
         } catch (error) {
           const message =
@@ -142,10 +211,32 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
           protocolVersion: message.version,
           hello: message
         };
-        socket.send(JSON.stringify(createFirmwareServerHello(sessionId)));
+
+        const serverHello = createFirmwareServerHello(sessionId);
+        socket.send(JSON.stringify(serverHello));
+        firmwareTransport = createTransport(
+          firmwareSession,
+          serverHello.audio_params
+        );
+
         console.log(
           `[firmware:${sessionId}] connected protocol=v${message.version} input=${message.audio_params.sample_rate}Hz/${message.audio_params.frame_duration}ms`
         );
+
+        if (options.firmwareSessionFactory) {
+          try {
+            firmwareHandler = await options.firmwareSessionFactory(
+              firmwareSession,
+              firmwareTransport
+            );
+          } catch (error) {
+            console.error(
+              `[firmware:${sessionId}] voice session setup failed`,
+              error
+            );
+            socket.close(1011, "voice session setup failed");
+          }
+        }
         return;
       }
 
@@ -168,6 +259,7 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
       }
 
       if (firmwareSession !== null) {
+        await firmwareHandler?.onEvent(message);
         await options.hooks?.onFirmwareEvent?.(firmwareSession, message);
         const type =
           isRecord(message) && typeof message.type === "string"
@@ -198,6 +290,37 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
           interaction: "thinking"
         });
       }
+    };
+
+    socket.on("message", (raw, isBinary) => {
+      messageChain = messageChain
+        .then(() => handleMessage(raw, isBinary))
+        .catch((error) => {
+          console.error(`[device:${sessionId}] message handling failed`, error);
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.close(1011, "gateway message handling failed");
+          }
+        });
+    });
+
+    socket.on("close", () => {
+      if (closed) return;
+      closed = true;
+
+      void (async () => {
+        try {
+          await messageChain.catch(() => undefined);
+          await firmwareHandler?.close();
+          if (firmwareSession) {
+            await options.hooks?.onFirmwareClosed?.(firmwareSession);
+          }
+        } catch (error) {
+          console.error(`[device:${sessionId}] cleanup failed`, error);
+        } finally {
+          firmwareHandler = null;
+          firmwareTransport = null;
+        }
+      })();
     });
   });
 
