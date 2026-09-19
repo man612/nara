@@ -1,4 +1,5 @@
 export type AudioChunk = {
+  format: "pcm16le";
   data: Uint8Array;
   sampleRate: number;
   channels: 1 | 2;
