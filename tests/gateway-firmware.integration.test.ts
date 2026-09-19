@@ -24,11 +24,12 @@ async function closeGateway(
   server: ReturnType<typeof createGatewayServer>["server"],
   wss: ReturnType<typeof createGatewayServer>["wss"]
 ) {
-  if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+  if (socket.readyState === WebSocket.OPEN) {
+    const closed = once(socket, "close");
     socket.close();
-    if (socket.readyState !== WebSocket.CLOSED) {
-      await once(socket, "close");
-    }
+    await closed;
+  } else if (socket.readyState === WebSocket.CONNECTING) {
+    socket.terminate();
   }
 
   await new Promise<void>((resolve) => wss.close(() => resolve()));
