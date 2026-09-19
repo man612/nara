@@ -4,7 +4,8 @@ Read this before broad code search.
 
 ## Runtime entry
 
-- `src/index.ts` — HTTP/WebSocket gateway bootstrap. Keep it thin.
+- `src/index.ts` — process/bootstrap entry only. Keep it thin.
+- `src/gateway.ts` — HTTP/WebSocket server, firmware/semantic session handshake and device-edge hooks.
 - `src/contracts/device.ts` — hardware-neutral semantic device messages.
 - `src/contracts/providers.ts` — voice/brain/search/memory contracts and normalized usage.
 - `src/provider-registry.ts` — provider construction and fallback composition.
@@ -51,6 +52,7 @@ Read this before broad code search.
 
 - `tests/device-contracts.test.ts`
 - `tests/firmware-wire.test.ts`
+- `tests/gateway-firmware.integration.test.ts`
 - `tests/provider-contracts.test.ts`
 - `tests/provider-config.test.ts`
 - `tests/provider-usage.test.ts`
