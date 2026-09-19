@@ -18,6 +18,21 @@ Initial adapters:
 - Gemini Live
 - GPT-Live
 
+The first implemented native adapter is Gemini Live. It uses the documented raw v1beta WebSocket edge rather than exposing a provider SDK to the rest of Nara.
+
+Current Gemini baseline:
+- model: `gemini-3.8-live`;
+- device/gateway PCM input: 16-bit little-endian mono at 16 kHz;
+- model audio output: 16-bit little-endian mono at 24 kHz;
+- response modality: audio;
+- automatic activity detection remains enabled so start-of-activity performs the provider's default barge-in behavior;
+- context-window compression uses the provider sliding-window mechanism;
+- session resumption is enabled and the latest resumable handle is retained;
+- a GoAway message starts a replacement WebSocket using that resumable handle;
+- input/output transcription is opt-in to avoid unnecessary text generation/usage when the UI does not need it.
+
+The adapter uses the existing `ws` dependency. The raw protocol is intentionally contained inside `src/providers/voice/gemini-live.ts`, so moving to the Google SDK later would not affect the device or codec contracts.
+
 Each adapter implements the same `VoiceProvider` and `VoiceSession` contracts. Provider-specific event formats stop at the adapter boundary.
 
 ## Chained voice
