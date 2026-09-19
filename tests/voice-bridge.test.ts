@@ -328,8 +328,12 @@ describe("FirmwareVoiceBridge", () => {
     const bridge = new FirmwareVoiceBridge({
       codecFactory,
       voiceProvider,
-      onUsage: (_session, value) => usage.push(value),
-      onToolCall: (_session, value) => tools.push(value)
+      onUsage: (_session, value) => {
+        usage.push(value);
+      },
+      onToolCall: (_session, value) => {
+        tools.push(value);
+      }
     });
     const handler = await bridge.createSession(
       createFirmwareSession(),
