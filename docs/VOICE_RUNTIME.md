@@ -8,6 +8,8 @@ ESP32-class devices connect to Nara Gateway over a small authenticated WebSocket
 
 Changing voice providers must not require reflashing the device.
 
+The gateway codec boundary is session-scoped: each physical connection owns its own Opus decoder, playback encoder, and partial PCM buffer. Provider PCM chunks are packetized independently from firmware framing so provider chunk duration never leaks into the device protocol.
+
 ## Native realtime voice
 
 Native speech-to-speech providers are the preferred path when low latency, barge-in and natural turn taking matter.
