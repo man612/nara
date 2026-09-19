@@ -157,6 +157,10 @@ describe("firmware realtime voice vertical slice", () => {
       `ws://127.0.0.1:${address.port}/device`
     );
     const messages = new MessageQueue(socket);
+    // Arm the open listener immediately. WASM codec initialization below can
+    // take longer than the localhost WebSocket handshake; attaching once("open")
+    // afterwards would intermittently miss an event that already fired.
+    const socketOpened = once(socket, "open");
     const uplinkEncoder = await createEncoder({
       sampleRate: 16000,
       channels: 1,
@@ -169,7 +173,7 @@ describe("firmware realtime voice vertical slice", () => {
     });
 
     try {
-      await once(socket, "open");
+      await socketOpened;
 
       socket.send(
         JSON.stringify({
