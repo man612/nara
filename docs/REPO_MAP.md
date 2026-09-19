@@ -30,7 +30,8 @@ Read this before broad code search.
 
 - `src/providers/brain/openai-compatible.ts` — common text brain adapter for compatible APIs.
 - `src/providers/brain/fallback.ts` — ordered fallback chain.
-- `src/providers/voice/` — realtime/chained voice adapters belong here.
+- `src/providers/voice/gemini-live.ts` — raw Gemini Live v1beta provider adapter, usage normalization and session resumption.
+- `src/providers/voice/` — other realtime/chained voice adapters belong here.
 
 ## Device development
 
@@ -59,6 +60,7 @@ Read this before broad code search.
 - `tests/gateway-firmware.integration.test.ts`
 - `tests/audio-codec.test.ts`
 - `tests/libopus-wasm.test.ts`
+- `tests/gemini-live.test.ts`
 - `tests/provider-contracts.test.ts`
 - `tests/provider-config.test.ts`
 - `tests/provider-usage.test.ts`

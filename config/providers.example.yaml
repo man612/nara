@@ -29,6 +29,10 @@ providers:
     kind: voice
     adapter: gemini-live
     model: ${GEMINI_LIVE_MODEL:-gemini-3.8-live}
+    api_key_env: GEMINI_API_KEY
+    # Transcription creates extra provider output/usage. Keep it opt-in.
+    input_transcription: false
+    output_transcription: false
 
   chained-free:
     kind: voice
