@@ -11,7 +11,9 @@ export class FallbackBrainProvider implements BrainProvider {
     id: string,
     private readonly providers: BrainProvider[]
   ) {
-    if (providers.length === 0) throw new Error("FallbackBrainProvider needs at least one provider");
+    if (providers.length === 0) {
+      throw new Error("FallbackBrainProvider needs at least one provider");
+    }
     this.id = id;
   }
 
@@ -20,7 +22,11 @@ export class FallbackBrainProvider implements BrainProvider {
 
     for (const provider of this.providers) {
       try {
-        return await provider.complete(request);
+        const response = await provider.complete(request);
+        return {
+          ...response,
+          providerId: response.providerId ?? provider.id
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         failures.push(`${provider.id}: ${message}`);
