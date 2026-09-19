@@ -18,7 +18,7 @@ const server = createServer(async (req, res) => {
 
   if (req.url === "/health") {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true, service: "companion-core" }));
+    res.end(JSON.stringify({ ok: true, service: "nara" }));
     return;
   }
 

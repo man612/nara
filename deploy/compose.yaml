@@ -1,5 +1,5 @@
 services:
-  companion-core:
+  nara:
     build:
       context: ..
       dockerfile: Dockerfile
@@ -10,7 +10,7 @@ services:
       PORT: 8787
       HERMES_BASE_URL: ${HERMES_BASE_URL:-http://hermes:8642/v1}
     ports:
-      - "${COMPANION_PORT:-8787}:8787"
+      - "${NARA_PORT:-8787}:8787"
     networks:
       - companion
 
@@ -31,7 +31,7 @@ services:
     networks:
       - companion
 networks:
-  companion:
+  nara:
     driver: bridge
 
 volumes:

@@ -4,7 +4,7 @@ The device transport and the voice runtime are deliberately separate.
 
 ## Stable device edge
 
-ESP32-class devices connect to Companion Gateway over a small authenticated WebSocket/audio protocol. The first firmware target can reuse efficient Opus framing while the server translates to whichever voice runtime is active.
+ESP32-class devices connect to Nara Gateway over a small authenticated WebSocket/audio protocol. The first firmware target can reuse efficient Opus framing while the server translates to whichever voice runtime is active.
 
 Changing voice providers must not require reflashing the device.
 

@@ -8,7 +8,7 @@ Copy the environment template, then run:
 
 ```bash
 cp .env.example .env
-docker compose -f deploy/compose.yaml up -d companion-core
+docker compose -f deploy/compose.yaml up -d nara
 ```
 
 To run the optional Hermes sidecar too:
@@ -21,4 +21,4 @@ Hermes port 8642 is intentionally **not published to the public host interface**
 
 ## Production rule
 
-Terminate TLS at a reverse proxy or managed ingress and expose only the Companion Gateway endpoint needed by devices. Keep model API keys, Hermes API keys and databases server-side.
+Terminate TLS at a reverse proxy or managed ingress and expose only the Nara Gateway endpoint needed by devices. Keep model API keys, Hermes API keys and databases server-side.
