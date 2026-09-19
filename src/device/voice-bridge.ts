@@ -43,6 +43,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
   private voiceEventChain: Promise<void> = Promise.resolve();
   private playbackGeneration = 0;
   private outputActive = false;
+  private suppressOutput = false;
   private closed = false;
 
   constructor(
@@ -87,6 +88,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     const type = typeof event.type === "string" ? event.type : "";
 
     if (type === "abort") {
+      this.suppressOutput = true;
       await this.interruptPlayback();
       await this.voice.interrupt();
       return;
@@ -100,6 +102,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
       // barge-in. Stop queued playback immediately; provider audio that follows
       // will be treated as a new response turn.
       if (this.outputActive) {
+        this.suppressOutput = true;
         await this.interruptPlayback();
         await this.voice.interrupt();
       }
@@ -145,12 +148,19 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
 
     switch (event.type) {
       case "audio": {
+        if (this.suppressOutput) return;
         const packets = await this.codec.encodeDownlink(event.chunk);
         this.enqueuePlayback(packets);
         return;
       }
 
       case "output.completed": {
+        if (this.suppressOutput) {
+          this.suppressOutput = false;
+          await this.codec.resetDownlink();
+          return;
+        }
+
         const finalPackets = await this.codec.flushDownlink();
         this.enqueuePlayback(finalPackets);
         await this.finishPlayback();
@@ -159,6 +169,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
 
       case "interrupted":
         await this.interruptPlayback();
+        this.suppressOutput = false;
         return;
 
       case "input.transcript":
