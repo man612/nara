@@ -5,6 +5,7 @@ import type {
 import type { ProviderDefinition, ProvidersConfig } from "./config/providers.js";
 import { FallbackBrainProvider } from "./providers/brain/fallback.js";
 import { OpenAICompatibleBrain } from "./providers/brain/openai-compatible.js";
+import { FallbackVoiceProvider } from "./providers/voice/fallback.js";
 import { GeminiLiveVoiceProvider } from "./providers/voice/gemini-live.js";
 
 function providerApiKey(
@@ -72,6 +73,31 @@ export function createPrimaryVoiceProvider(
   const definition = config.providers[id];
   if (!definition) throw new Error(`Unknown provider: ${id}`);
   return createVoiceProvider(id, definition);
+}
+
+export function createVoiceChain(config: ProvidersConfig): VoiceProvider {
+  const ids = [config.voice.primary, ...config.voice.fallbacks];
+
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Voice provider route contains duplicate provider IDs");
+  }
+
+  const candidates = ids.map((id) => {
+    const definition = config.providers[id];
+    if (!definition) throw new Error(`Unknown provider: ${id}`);
+    if (definition.kind !== "voice") {
+      throw new Error(`Provider ${id} is not a voice provider`);
+    }
+
+    return {
+      id,
+      create: () => createVoiceProvider(id, definition)
+    };
+  });
+
+  return candidates.length === 1
+    ? candidates[0]!.create()
+    : new FallbackVoiceProvider("voice-fallback", candidates);
 }
 
 export function createBrainChain(config: ProvidersConfig): BrainProvider {
