@@ -1,8 +1,8 @@
 voice:
   primary: gemini-live
-  fallbacks:
-    - chained-free
-    - openai-live
+  # Add fallback IDs only for voice adapters that are actually implemented.
+  # GPT-Live and chained STT -> brain -> TTS remain roadmap adapters.
+  fallbacks: []
 
 brain:
   primary: deepseek
@@ -20,11 +20,6 @@ memory:
   primary: local
 
 providers:
-  openai-live:
-    kind: voice
-    adapter: openai-live
-    model: ${OPENAI_LIVE_MODEL:-gpt-live-1}
-
   gemini-live:
     kind: voice
     adapter: gemini-live
@@ -33,12 +28,6 @@ providers:
     # Transcription creates extra provider output/usage. Keep it opt-in.
     input_transcription: false
     output_transcription: false
-
-  chained-free:
-    kind: voice
-    adapter: chained
-    stt: local-whisper
-    tts: edge
 
   deepseek:
     kind: brain
