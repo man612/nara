@@ -17,10 +17,9 @@ physical / virtual device
    |        |         |
  voice     brain    character
    |        |         |
-GPT Live   DeepSeek   profiles
-Gemini     Hermes     emotion
-chained    OpenRouter memory
-Pipecat    local LLM
+Gemini     DeepSeek   profiles
+future     Hermes     emotion
+adapters   OpenRouter memory
         |
       tools
  search / browser / reminders / MCP
@@ -30,7 +29,7 @@ The realtime voice path stays thin. Slow web search, browser work, long reasonin
 
 ## Provider strategy
 
-- Voice: Gemini Live, GPT-Live, Pipecat-backed runtimes, or a cheap chained STT -> brain -> TTS path.
+- Voice: Gemini Live is implemented; GPT-Live, Pipecat-backed runtimes, and a cheap chained STT -> brain -> TTS path are planned behind the same contract.
 - Brain: any OpenAI-compatible endpoint; DeepSeek, Hermes, OpenRouter and local gateways can share one adapter.
 - Agent/tools: Hermes Agent is optional and can run on a VPS or managed service.
 - Search: Hermes, SearXNG, DDGS, Brave, provider-native search, or future adapters.
@@ -43,8 +42,9 @@ Nara does not assume a permanent host. It can run on a laptop, home server, gene
 
 ## Status
 
-The physical realtime voice path is now wired end-to-end at the gateway layer: firmware Opus framing, session-scoped Opus/PCM transcoding, a resumable Gemini Live adapter, bounded device playback pacing, interruption handling, and provider-neutral session lifecycle are implemented and covered by a real-Opus WebSocket integration test.
+The physical realtime voice path is wired end-to-end at the gateway layer: firmware Opus framing, session-scoped Opus/PCM transcoding, a resumable Gemini Live adapter, bounded device playback pacing, interruption handling, provider-neutral session lifecycle, and connect-time voice-provider fallback routing are implemented and covered by automated tests including a real-Opus WebSocket vertical slice.
 
 The standalone firmware also has the portable Nara face engine integrated into the Waveshare runtime.
 
-Next milestones are hardware-in-the-loop voice validation, tool execution from realtime provider calls, additional voice adapters/fallbacks, and memory/search integration.
+Next milestones are hardware-in-the-loop voice validation, tool execution from realtime provider calls, additional production voice adapters, memory/search integration, and later in-session provider recovery where it is technically safe.
+
