@@ -7,7 +7,7 @@ import {
   type FirmwareSessionFactory,
   type GatewayOptions
 } from "./gateway.js";
-import { createPrimaryVoiceProvider } from "./provider-registry.js";
+import { createVoiceChain } from "./provider-registry.js";
 
 async function createFirmwareVoiceFactory(): Promise<
   FirmwareSessionFactory | undefined
@@ -18,13 +18,13 @@ async function createFirmwareVoiceFactory(): Promise<
   }
 
   const providersConfig = await loadProvidersConfig(providersFile);
-  const voiceProvider = createPrimaryVoiceProvider(providersConfig);
+  const voiceProvider = createVoiceChain(providersConfig);
   const bridge = new FirmwareVoiceBridge({
     voiceProvider,
     codecFactory: createLibopusWasmCodecFactory(),
     onUsage: (session, usage) => {
       console.log(
-        `[firmware:${session.sessionId}] voice usage provider=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`
+        `[firmware:${session.sessionId}] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`
       );
     },
     onToolCall: (session, event) => {
@@ -35,7 +35,7 @@ async function createFirmwareVoiceFactory(): Promise<
   });
 
   console.log(
-    `Voice provider:     ${voiceProvider.id} (${providersFile})`
+    `Voice route:        ${voiceProvider.id} (${providersFile})`
   );
   return bridge.createSession;
 }

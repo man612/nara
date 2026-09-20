@@ -14,11 +14,13 @@ The gateway codec boundary is session-scoped: each physical connection owns its 
 
 Native speech-to-speech providers are the preferred path when low latency, barge-in and natural turn taking matter.
 
-Initial adapters:
-- Gemini Live
-- GPT-Live
+Implemented production adapter:
+- Gemini Live.
 
-The first implemented native adapter is Gemini Live. It uses the documented raw v1beta WebSocket edge rather than exposing a provider SDK to the rest of Nara.
+Planned native adapter:
+- GPT-Live.
+
+The Gemini Live adapter uses the documented raw v1beta WebSocket edge rather than exposing a provider SDK to the rest of Nara.
 
 Current Gemini baseline:
 - model: `gemini-3.8-live`;
@@ -35,13 +37,21 @@ The adapter uses the existing `ws` dependency. The raw protocol is intentionally
 
 Each adapter implements the same `VoiceProvider` and `VoiceSession` contracts. Provider-specific event formats stop at the adapter boundary.
 
+## Voice fallback
+
+A configured route may contain a primary voice provider plus fallback providers.
+
+Fallback currently happens while opening a voice session: if the primary cannot be constructed or cannot connect, Nara tries the next configured provider. This is intentionally separate from in-session recovery. Once a realtime conversation has opened on one provider, Nara does not migrate that active conversation to a different provider yet.
+
+The example configuration only activates Gemini Live because GPT-Live and chained voice are not implemented yet. A second implemented adapter can be added to `voice.fallbacks` without changing firmware.
+
 ## Chained voice
 
 A chained runtime is:
 
 `STT -> BrainProvider -> TTS`
 
-This path is valuable for inexpensive or self-hosted deployments. It can mix local Whisper, hosted transcription, any configured brain, and local/free/hosted TTS.
+This path is planned but not implemented yet. It is valuable for inexpensive or self-hosted deployments because it can mix local Whisper, hosted transcription, any configured brain, and local/free/hosted TTS.
 
 It normally has more latency than native speech-to-speech but gives maximum portability.
 
@@ -49,9 +59,9 @@ It normally has more latency than native speech-to-speech but gives maximum port
 
 LiveKit Agents can be added as an adapter when WebRTC, browser/mobile clients, telephony or LiveKit infrastructure is useful.
 
-Pipecat can be added as an adapter when its Python realtime pipeline ecosystem is useful, especially for chained STT/LLM/TTS experimentation. Pipecat also now maintains an ESP32-S3 client SDK using SmallWebRTC; that is a serious optional device-transport candidate, but it must be ported and measured on the Waveshare 1.85B before adoption.
+Pipecat can be added as an adapter when its Python realtime pipeline ecosystem is useful, especially for chained STT/LLM/TTS experimentation. Pipecat also maintains an ESP32-S3 client SDK using SmallWebRTC; that is a serious optional device-transport candidate, but it must be ported and measured on the Waveshare 1.85B before adoption.
 
-Neither framework is a mandatory dependency of Companion Core. The device contract remains independent from WebSocket/Opus, SmallWebRTC/Pipecat, and LiveKit.
+Neither framework is a mandatory dependency of Nara. The device contract remains independent from WebSocket/Opus, SmallWebRTC/Pipecat, and LiveKit.
 
 ## Interruption
 
@@ -65,10 +75,9 @@ The core voice contract carries:
 
 AEC/VAD close to the device and interruption semantics in the voice adapter are both required for natural barge-in.
 
-
 ## Physical firmware session bridge
 
-The physical realtime path is now assembled from replaceable boundaries:
+The physical realtime path is assembled from replaceable boundaries:
 
 ```text
 ESP32 microphone
@@ -110,7 +119,7 @@ A manual microphone stop uses the optional provider-neutral `VoiceSession.endAud
 
 ## Runtime configuration
 
-Physical voice is enabled when `PROVIDERS_FILE` is set. The runtime loads the configured primary voice provider, creates the codec factory, and attaches the bridge to physical firmware sessions.
+Physical voice is enabled when `PROVIDERS_FILE` is set. The runtime loads the configured voice route, creates the codec factory, and attaches the bridge to physical firmware sessions.
 
 Without `PROVIDERS_FILE`, Nara still starts in edge-only development mode: health checks and the virtual device remain available, but physical firmware audio is not connected to an AI provider.
 
