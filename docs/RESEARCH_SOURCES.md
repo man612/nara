@@ -174,3 +174,38 @@ References:
 
 - https://www.nist.gov/publications/2016-nist-speaker-recognition-evaluation
 - https://www.nist.gov/publications/2018-nist-speaker-recognition-evaluation
+
+
+## Offline voice and local-runtime research
+
+Purpose: define what Nara can truthfully promise with no Internet and where local compute should live.
+
+Useful findings:
+
+- ESP-SR MultiNet provides offline command recognition on ESP32-S3 for up to 200 custom commands, with official Chinese/English support.
+- ESP-SR's embedded speech-synthesis module currently supports Chinese only.
+- The Waveshare 1.85B has an RTC and TF/microSD in addition to touch, IMU, audio and BLE, so meaningful isolated-device utilities and local media are practical.
+- ESP32-S3 supports Bluetooth LE but not Bluetooth Classic or LE Audio, so BLE should be used for control/pairing/sync rather than assumed as a general audio link.
+- Home Assistant demonstrates a fully local voice architecture where an embedded voice endpoint delegates STT/TTS to local network services through Wyoming.
+- Whisper is multilingual and includes Indonesian, making it a local-network STT candidate.
+- The current Open Home Foundation Piper continuation lists Bahasa Indonesia, but its GPL licensing means Nara should treat it as an optional external service unless redistribution implications are explicitly reviewed.
+- ESP-IDF supports NVS and flash encryption for production device storage, with irreversible/lifecycle implications that must be validated before manufacturing settings are burned.
+
+Decision:
+
+Nara adopts capability degradation rather than a binary online/offline product state. The isolated ESP32 stays useful with local utilities and an authorized offline personal capsule; free-form Indonesian voice can be restored by a local-network compute node without changing the device protocol.
+
+References:
+
+- https://docs.espressif.com/projects/esp-sr/en/latest/esp32s3/speech_command_recognition/README.html
+- https://docs.espressif.com/projects/esp-sr/en/latest/esp32s3/getting_started/readme.html
+- https://docs.espressif.com/projects/esp-sr/en/latest/esp32/speech_synthesis/readme.html
+- https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.85B
+- https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-guides/ble/overview.html
+- https://docs.espressif.com/projects/esp-adf/en/latest/solution-center/bluetooth-audio.html
+- https://www.home-assistant.io/integrations/wyoming
+- https://www.home-assistant.io/voice_control/voice_remote_local_assistant
+- https://github.com/openai/whisper
+- https://github.com/OHF-Voice/piper1-gpl
+- https://k2-fsa.github.io/sherpa/onnx/
+- https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/nvs_encryption.html
