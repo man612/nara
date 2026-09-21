@@ -201,8 +201,9 @@ export class TelegramBridge {
         }
         const result = await this.options.voiceControls.executeTool(
           {
-            name: "device_notify",
+            name: "device_companion",
             arguments: {
+              op: "notify",
               text: argument,
               emotion: "happy",
               sound: "builtin:popup"
