@@ -56,7 +56,7 @@ export class HermesAgentClient {
   async health(signal?: AbortSignal): Promise<boolean> {
     const response = await this.fetchImpl(this.endpoint("/health"), {
       headers: this.headers(false),
-      signal
+      ...(signal ? { signal } : {})
     });
     return response.ok;
   }
@@ -87,7 +87,7 @@ export class HermesAgentClient {
         ...(input.model ? { model: input.model } : {}),
         ...(input.provider ? { provider: input.provider } : {})
       }),
-      signal
+      ...(signal ? { signal } : {})
     });
 
     if (!response.ok) {
@@ -101,7 +101,10 @@ export class HermesAgentClient {
   async getRun(runId: string, signal?: AbortSignal): Promise<HermesRun> {
     const response = await this.fetchImpl(
       this.endpoint("/v1/runs/" + encodeURIComponent(runId)),
-      { headers: this.headers(false), signal }
+      {
+        headers: this.headers(false),
+        ...(signal ? { signal } : {})
+      }
     );
     if (!response.ok) {
       throw new Error(
@@ -118,7 +121,7 @@ export class HermesAgentClient {
         method: "POST",
         headers: this.headers(true),
         body: "{}",
-        signal
+        ...(signal ? { signal } : {})
       }
     );
     if (!response.ok) {
