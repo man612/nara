@@ -113,3 +113,64 @@ Useful ideas:
 - unified OpenAI-style provider gateway.
 
 Decision: do not add it to the minimum Nara deployment today. Nara already has a lightweight provider layer, and another always-on Python service would add RAM/operational cost on a small VPS. Re-evaluate if multi-user billing, dashboarding, or complex provider routing becomes valuable.
+
+## ESP-SR AFE / microphone design / audio robustness
+
+Purpose: audio-front-end baseline and hardware validation guidance for the first Waveshare device.
+
+Useful findings:
+
+- AEC, NS, VAD, WakeNet and multi-mic source separation are separate AFE capabilities and should be measured independently.
+- Espressif recommends `AEC_MODE_FD_LOW_COST` as a general full-duplex performance/resource balance.
+- AEC NLP aggressiveness trades residual-echo suppression against damage to near-end speech.
+- microphone hole geometry, sealing, speaker isolation, array consistency, clipping, reference level and enclosure design materially affect recognition.
+- Espressif distinguishes one-mic + reference (`MR`) from multi-mic AFE layouts in its benchmarks.
+
+Nara-specific finding:
+
+The current Nara 1.85B path derives `MR` from the generic `BoxAudioCodec` when playback reference is enabled, even though Waveshare advertises the board as dual-microphone. A recent XiaoZhi issue reports a related Waveshare 1.75 board needed board-specific ES7210 TDM reordering to expose two microphones plus reference. Treat that as a hypothesis to validate on the real 1.85B, not as a patch to copy blindly.
+
+Decision:
+
+Do not change the 1.85B audio channel layout based on the related-board report alone. First capture and identify the physical TDM slots on hardware, then tune AEC/NS/gain and compare one-mic versus two-mic processing.
+
+References:
+
+- https://docs.espressif.com/projects/esp-sr/en/latest/esp32s3/acoustic_echo_cancellation/README.html
+- https://docs.espressif.com/projects/esp-sr/en/latest/esp32/audio_front_end/Espressif_Microphone_Design_Guidelines.html
+- https://docs.espressif.com/projects/esp-sr/en/latest/esp32s3/benchmark/README.html
+- https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.85B
+- https://github.com/78/xiaozhi-esp32/issues/2229
+
+## Home Assistant Voice Preview Edition
+
+Purpose: reference for how a modern open voice device treats the acoustic front end.
+
+Useful idea:
+
+Home Assistant pairs an ESP32-S3 with dual microphones and a dedicated XMOS XU316 audio processor for echo cancellation, stationary-noise removal and automatic gain control.
+
+Decision:
+
+Use this as evidence that audio-front-end quality deserves dedicated engineering, not as a requirement to add XMOS to Nara. Tune and measure the current Waveshare + ESP-SR path first; dedicated DSP or a different hardware target is an escalation only if measured results justify it.
+
+Reference:
+
+- https://www.home-assistant.io/voice-pe/
+
+## NIST speaker-recognition evaluations
+
+Purpose: reminder that speaker identity is probabilistic and sensitive to recording conditions.
+
+Useful finding:
+
+NIST evaluations document significant speaker-recognition performance changes under domain/channel, language, duration and recording-condition mismatch.
+
+Decision:
+
+Voice/speaker recognition is a personalization/confidence signal, not Nara's root authentication mechanism. When identity is uncertain, preserve general functionality and reduce privilege rather than locking the companion.
+
+References:
+
+- https://www.nist.gov/publications/2016-nist-speaker-recognition-evaluation
+- https://www.nist.gov/publications/2018-nist-speaker-recognition-evaluation
