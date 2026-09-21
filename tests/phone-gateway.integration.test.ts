@@ -2,7 +2,10 @@ import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import WebSocket from "ws";
-import { createGatewayServer } from "../src/gateway.js";
+import {
+  createGatewayServer,
+  type PhoneSessionTransport
+} from "../src/gateway.js";
 import { encodePhonePcmFrame } from "../src/phone/protocol.js";
 
 function phoneProtocols(token: string): string[] {
@@ -15,9 +18,7 @@ function phoneProtocols(token: string): string[] {
 describe("authenticated phone audio gateway", () => {
   it("accepts the phone token, forwards PCM, and returns framed audio", async () => {
     let receivedSamples = 0;
-    let transportRef:
-      | Parameters<NonNullable<Parameters<typeof createGatewayServer>[0]["phoneSessionFactory"]>>[0]
-      | undefined;
+    let transportRef: PhoneSessionTransport | undefined;
 
     const gateway = createGatewayServer({
       deviceToken: "device-secret",
