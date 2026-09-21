@@ -15,7 +15,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export type PersonalMemoryToolContext = {
-  viewerId: string;
+  viewerId: string | (() => string);
   subjectId: string;
   limit?: number;
 };
@@ -73,8 +73,13 @@ export class PersonalMemoryToolProvider implements ToolProvider {
       return this.failure(call, `query must be 1..${MAX_QUERY_LENGTH} characters`);
     }
 
+    const viewerId =
+      typeof this.context.viewerId === "function"
+        ? this.context.viewerId()
+        : this.context.viewerId;
+
     const facts = await this.store.recall({
-      viewerId: this.context.viewerId,
+      viewerId,
       subjectId: this.context.subjectId,
       query,
       limit: this.context.limit ?? DEFAULT_LIMIT
