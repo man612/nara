@@ -87,7 +87,7 @@ export class CompanionRuntime {
   private weather?: OpenMeteoWeatherClient;
   private telegram?: TelegramBridge;
   private dailyBriefing?: DailyBriefingScheduler;
-  private targetDeviceId?: string;
+  private targetDeviceId: string | undefined;
   private briefingTimezone = "UTC";
   private started = false;
 
