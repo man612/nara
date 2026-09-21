@@ -60,14 +60,19 @@ Before attaching a third-party battery:
 
 ### TF/microSD card
 
-Not required for Nara's core cloud/local runtime.
+Not required for the first powered desk test or the minimum offline utility mode.
 
-Only buy/use one when testing:
+Because offline usefulness is now a product requirement, a TF/microSD card becomes **recommended for the offline personal-capsule milestone**, especially for:
 
-- offline media;
-- local assets that do not fit comfortably in flash;
-- local logs/diagnostics;
-- future offline data features.
+- selected photos and gift media;
+- pre-recorded personal voice messages;
+- larger local assets that do not fit comfortably in flash;
+- offline personal-capsule media;
+- local diagnostics/log export.
+
+Core offline functions such as face/touch, clock, timers, alarms, device status, and small built-in sounds should not require a card.
+
+Do not store sensitive personal content on removable media in plaintext by default.
 
 ### Extra development accessories
 
@@ -94,7 +99,7 @@ Software work can continue without the board for:
 - simulated device behavior;
 - automated protocol tests.
 
-Hardware should be on hand by the time P4 in `docs/PROJECT_STATE.md` begins, because these cannot be trusted from simulation alone:
+Hardware should be on hand by the time the hardware-validation phase in `docs/PROJECT_STATE.md` begins, because these cannot be trusted from simulation alone:
 
 - real microphone quality;
 - echo cancellation;
