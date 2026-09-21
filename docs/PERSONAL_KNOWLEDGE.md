@@ -248,3 +248,41 @@ Important constraints:
 - memory text is serialized as reference data and explicitly marked as data rather than instructions.
 
 The current file format remains version 1. A future storage-format change must ship with an explicit migration path; do not silently reinterpret unknown versions.
+
+
+## Realtime voice retrieval
+
+Realtime voice uses the same access boundary without dumping the memory database into the live session prompt.
+
+```text
+Gemini/voice provider
+       |
+       | optional tool call: personal_memory_search(query)
+       v
+Action Runtime
+       |
+       v
+PersonalMemoryToolProvider
+       |
+       | viewerId + subjectId fixed by server
+       v
+PersonalMemoryStore.recall()
+       |
+       | expiry + subject + access + relevance + limit
+       v
+compact authorized facts only
+       |
+       v
+tool result back to voice provider
+```
+
+The model cannot choose `viewerId` or `subjectId`. Extra identity-like arguments are ignored because identity is a server/session concern.
+
+Current production bootstrap is intentionally conservative: firmware authentication proves which physical Nara connected, not which human is speaking. Until a strong viewer signal is supplied by authenticated account/phone/physical confirmation, realtime voice binds the viewer to `person:guest`. That means only public facts are eligible.
+
+This avoids two unsafe shortcuts:
+
+- treating ownership of a device as proof that every nearby speaker is the owner/partner;
+- treating speaker-recognition confidence as authorization for private memory.
+
+Trusted/private realtime recall should be enabled only after the session has a stronger authenticated viewer identity.

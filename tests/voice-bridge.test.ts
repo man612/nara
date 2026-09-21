@@ -6,6 +6,7 @@ import type {
 } from "../src/audio/codec.js";
 import type {
   AudioChunk,
+  VoiceConnectOptions,
   VoiceEventHandler,
   VoiceProvider,
   VoiceSession,
@@ -112,8 +113,10 @@ class FakeVoiceSession implements VoiceSession {
 class FakeVoiceProvider implements VoiceProvider {
   readonly id = "fake";
   readonly session = new FakeVoiceSession();
+  connectOptions: VoiceConnectOptions | undefined;
 
-  async connect(): Promise<VoiceSession> {
+  async connect(options?: VoiceConnectOptions): Promise<VoiceSession> {
+    this.connectOptions = options;
     return this.session;
   }
 }
@@ -424,6 +427,90 @@ describe("FirmwareVoiceBridge", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(voiceProvider.session.toolResults).toHaveLength(0);
+    await handler.close();
+  });
+
+
+  it("exposes server-side session tools even when the firmware has no MCP support", async () => {
+    const codecFactory = new FakeCodecFactory();
+    const voiceProvider = new FakeVoiceProvider();
+    const { transport } = createTransport();
+    const calls: unknown[] = [];
+
+    const bridge = new FirmwareVoiceBridge({
+      codecFactory,
+      voiceProvider,
+      createToolProviders: () => [
+        {
+          id: "server-tool",
+          async listTools() {
+            return [
+              {
+                name: "server_lookup",
+                description: "Lookup server-side context.",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    query: { type: "string" }
+                  },
+                  required: ["query"],
+                  additionalProperties: false
+                },
+                effect: "read" as const
+              }
+            ];
+          },
+          async callTool(call) {
+            calls.push(call);
+            return {
+              name: call.name,
+              ok: true,
+              ...(call.callId ? { callId: call.callId } : {}),
+              value: { answer: "server-only" },
+              scheduling: "silent" as const
+            };
+          }
+        }
+      ]
+    });
+
+    const handler = await bridge.createSession(
+      createFirmwareSession(false),
+      transport
+    );
+
+    expect(voiceProvider.connectOptions?.tools).toEqual([
+      expect.objectContaining({
+        name: "server_lookup",
+        effect: "read"
+      })
+    ]);
+
+    await voiceProvider.session.emit({
+      type: "tool.call",
+      name: "server_lookup",
+      arguments: { query: "hello" },
+      callId: "server-1"
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(calls).toEqual([
+      {
+        name: "server_lookup",
+        arguments: { query: "hello" },
+        callId: "server-1"
+      }
+    ]);
+    expect(voiceProvider.session.toolResults).toEqual([
+      {
+        name: "server_lookup",
+        ok: true,
+        callId: "server-1",
+        value: { answer: "server-only" },
+        scheduling: "silent"
+      }
+    ]);
+
     await handler.close();
   });
 

@@ -147,10 +147,22 @@ See `docs/OFFLINE_RUNTIME.md`.
 
 ### P4 — memory in conversation
 
-- text-path integration first because it is easier to test deterministically;
-- then voice transcript -> memory candidate -> retrieval -> answer;
-- keep raw transcripts optional and short-lived;
-- summarize/normalize durable facts instead of storing every utterance forever.
+Status: text-path privacy proof complete; guest/public realtime memory retrieval implemented behind the Action Runtime.
+
+Implemented:
+
+- text-path context composition after access filtering;
+- realtime `personal_memory_search` tool exposed through the provider-neutral Action Runtime;
+- realtime memory viewer/subject are fixed server-side, not chosen by the model;
+- current voice path deliberately uses `person:guest`, so it can retrieve only public facts until strong viewer authentication is wired;
+- memory search results are compact and omit access-policy metadata.
+
+Still required:
+
+- bind a strong authenticated viewer signal from phone/account/physical approval into each voice session;
+- then allow trusted/private memory according to the same existing access policy;
+- add transcript -> memory-candidate review/normalization before durable writes;
+- keep raw transcripts optional and short-lived rather than storing every utterance forever.
 
 ### P5 — hardware-in-the-loop validation
 

@@ -3,6 +3,8 @@ import { createLibopusWasmCodecFactory } from "./audio/libopus-wasm.js";
 import { loadProvidersConfig } from "./config/providers.js";
 import { DeviceRegistry } from "./device/registry.js";
 import { FirmwareVoiceBridge } from "./device/voice-bridge.js";
+import { FilePersonalMemoryStore } from "./memory/personal.js";
+import { PersonalMemoryToolProvider } from "./memory/tool-provider.js";
 import {
   createGatewayServer,
   type FirmwareSessionFactory,
@@ -10,9 +12,14 @@ import {
 } from "./gateway.js";
 import { createVoiceChain } from "./provider-registry.js";
 
-async function createFirmwareVoiceFactory(): Promise<
-  FirmwareSessionFactory | undefined
-> {
+type VoiceMemoryRuntime = {
+  store: FilePersonalMemoryStore;
+  subjectId: string;
+};
+
+async function createFirmwareVoiceFactory(
+  voiceMemory?: VoiceMemoryRuntime
+): Promise<FirmwareSessionFactory | undefined> {
   const providersFile = process.env.PROVIDERS_FILE;
   if (!providersFile) {
     return undefined;
@@ -32,7 +39,21 @@ async function createFirmwareVoiceFactory(): Promise<
       console.log(
         `[firmware:${session.sessionId}] tool call name=${event.name} id=${event.callId ?? "?"}`
       );
-    }
+    },
+    ...(voiceMemory
+      ? {
+          createToolProviders: () => [
+            // Device authentication proves which Nara body connected, not who
+            // is currently speaking. Until a strong viewer signal is wired,
+            // realtime voice is intentionally guest-scoped and can retrieve
+            // public facts only.
+            new PersonalMemoryToolProvider(voiceMemory.store, {
+              viewerId: "person:guest",
+              subjectId: voiceMemory.subjectId
+            })
+          ]
+        }
+      : {})
   });
 
   console.log(
@@ -49,7 +70,18 @@ async function main(): Promise<void> {
   const deviceRegistry = await DeviceRegistry.open({
     filePath: deviceRegistryFile
   });
-  const firmwareSessionFactory = await createFirmwareVoiceFactory();
+
+  const personalMemoryFile = process.env.NARA_PERSONAL_MEMORY_FILE;
+  const memorySubjectId = process.env.NARA_MEMORY_SUBJECT_ID;
+  const voiceMemory =
+    personalMemoryFile && memorySubjectId
+      ? {
+          store: new FilePersonalMemoryStore(personalMemoryFile),
+          subjectId: memorySubjectId
+        }
+      : undefined;
+
+  const firmwareSessionFactory = await createFirmwareVoiceFactory(voiceMemory);
 
   const options: GatewayOptions = {
     ...(deviceToken ? { deviceToken } : {}),
@@ -62,6 +94,11 @@ async function main(): Promise<void> {
     console.log(`Companion gateway: http://localhost:${port}`);
     console.log(`Virtual device:   http://localhost:${port}/virtual-device`);
     console.log(`Device registry:  ${deviceRegistryFile}`);
+    if (voiceMemory) {
+      console.log(
+        `Voice memory:      guest/public scope subject=${voiceMemory.subjectId} file=${personalMemoryFile}`
+      );
+    }
 
     if (!deviceToken) {
       console.warn(
