@@ -47,13 +47,17 @@ Real names, private biography, relationship details, credentials, recordings and
 - background saved-network scan/retry and automatic gateway recovery;
 - deliberate BOOT long-press recovery into Wi-Fi configuration;
 - physical CST816S/QMI8658 bring-up and local interaction path;
+- CST816S touch-driven gaze plus deterministic tap, double-tap, hold and stroke/pet classification;
 - deterministic flip/shake/spin gesture classifier foundation;
-- local gesture reactions that do not require a gateway or AI tokens;
+- local touch/motion reactions that do not require a gateway or AI tokens;
 - persistent per-gesture reaction configuration;
 - custom reaction sounds loaded from the asset partition;
 - private local `reaction-assets` staging directory excluded from public Git;
 - user/admin-only HTTPS complete-asset-pack install path using the existing asset partition updater;
 - BQ27220 battery-level integration and automatic low/critical battery policy;
+- PCF85063 RTC integration with system-clock restore and online correction;
+- persistent local timer and daily-alarm state;
+- offline hold-to-show-time and configurable double-tap quick timer behavior;
 - face gaze target API prepared for external local vision;
 - firmware OTA verification including expected SHA-256/size and device credential reuse.
 
@@ -115,7 +119,8 @@ The inherited `78/esp-wifi-connect` configuration portal still uses an open Soft
 Implemented in firmware:
 
 - local touch/IMU sensor path;
-- local gaze/touch behavior foundation;
+- touch-driven gaze target;
+- tap/double-tap/hold/stroke-pet classification;
 - flip/shake/spin classification;
 - local reaction emotion/sound policy;
 - persistent gesture-specific configuration;
@@ -163,11 +168,14 @@ Already implemented:
 - local face behavior;
 - local physical reactions;
 - local reaction sounds;
-- local battery policy.
+- local battery policy;
+- RTC-backed clock restore/synchronization;
+- persistent timer and daily alarm foundations;
+- touch shortcuts for local time and a configurable quick timer.
 
 Still staged:
 
-- touch-driven local clock/timer/alarm UX;
+- richer local navigation/status UI around the utility foundation;
 - offline personal capsule compiler/storage/search;
 - direct secure SoftAP peer UI on the ESP32;
 - local-network STT/LLM/TTS adapters;
@@ -214,10 +222,10 @@ Passkey-first account authentication remains the preferred product direction.
 
 ### P2 — isolated-device utility/capsule UX
 
-Implement the richer no-network product layer:
+The RTC/timer/alarm firmware foundation is implemented. Expand the no-network
+product layer with:
 
-- RTC-backed clock/timer/alarm;
-- local navigation/status;
+- richer local navigation/status around the implemented clock/timer/alarm;
 - permission-filtered offline personal capsule;
 - deterministic local lookup;
 - local notes/messages/media;

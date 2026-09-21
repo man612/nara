@@ -12,11 +12,15 @@ Already implemented:
 - a configured device without a reachable saved Wi-Fi network stays in useful local idle instead of repeatedly forcing first-use provisioning;
 - saved networks keep scanning/retrying in the background;
 - a returning known network automatically reactivates the gateway;
-- Nara face, local motion reflexes, custom reaction sounds and battery policy do not require cloud inference.
+- Nara face, touch/motion reflexes, custom reaction sounds and battery policy do not require cloud inference;
+- CST816S touch can drive local gaze and classify tap, double-tap, hold and stroke/pet gestures;
+- PCF85063 can restore the system clock and receive online clock correction;
+- timer and daily-alarm state persist locally;
+- while offline, hold can show local time and double-tap can start a configurable quick timer.
 
 Still staged:
 
-- RTC-backed clock/timer/alarm UI;
+- richer local navigation/status UI around those utility primitives;
 - permission-filtered offline personal capsule and deterministic local search;
 - ESP32-created secure SoftAP peer UI;
 - local-network STT/LLM/TTS.
@@ -98,13 +102,20 @@ Nara must still provide useful local behavior.
 
 The Waveshare 1.85B includes a PCF85063 RTC.
 
-Target local features:
+Implemented foundation:
 
-- clock;
-- timers;
-- alarms;
-- simple scheduled reminders already synchronized to the device;
-- reconnect-time clock correction when network time becomes available.
+- RTC-backed clock restore;
+- reconnect/online clock correction;
+- persistent timers;
+- persistent daily alarm;
+- local alert firing and touch dismissal;
+- offline hold-to-show-time;
+- configurable double-tap quick timer.
+
+Still targeted:
+
+- richer clock/timer/alarm navigation and editing UI;
+- simple scheduled reminders already synchronized to the device.
 
 ### Offline gift/personal capsule
 
@@ -408,15 +419,21 @@ Later, if local Indonesian STT is available through a LAN/phone provider, natura
 
 ### O1 — local utility mode
 
-- local clock;
-- timer/alarm;
-- battery/status;
-- touch/button navigation;
-- offline indicator;
-- face/IMU behavior;
-- audio diagnostics.
+Implemented foundation:
 
-No microSD required.
+- local RTC-backed clock;
+- timer/daily alarm;
+- local touch shortcuts;
+- battery policy/status foundations;
+- face/touch/IMU behavior.
+
+Remaining O1 product work:
+
+- richer touch/button navigation;
+- a clearer offline/status surface;
+- offline audio diagnostics.
+
+No microSD is required.
 
 ### O2 — offline personal capsule
 
