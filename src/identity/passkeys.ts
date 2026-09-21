@@ -772,6 +772,18 @@ export class PasskeyRegistry {
     };
   }
 
+  getEnrollmentIdentity(
+    enrollmentToken: string
+  ): HumanViewerIdentity {
+    const enrollment = this.requireEnrollment(enrollmentToken);
+    return {
+      personId: enrollment.personId,
+      ...(enrollment.accountId
+        ? { accountId: enrollment.accountId }
+        : {})
+    };
+  }
+
   createRegistrationOptions(input: {
     enrollmentToken: string;
     displayName: string;
