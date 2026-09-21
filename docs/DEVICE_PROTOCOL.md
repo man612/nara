@@ -9,12 +9,19 @@ Physical firmware connects to:
 
 `ws(s)://<gateway>/device`
 
-If `NARA_DEVICE_TOKEN` is configured, the gateway requires:
+Firmware sends stable identity headers:
 
-`Authorization: Bearer <token>`
+```text
+Device-Id: <hardware/network device id>
+Client-Id: <stable Nara client UUID>
+Authorization: Bearer <credential>
+```
 
-The firmware already supports a runtime WebSocket token and prepends `Bearer ` when needed.
-Prefer runtime provisioning/NVS over committing credentials into source.
+Nara Gateway now supports a persistent per-device registry. For a registry device in `active` state, `Authorization` must contain that device's own credential; the legacy global `NARA_DEVICE_TOKEN` cannot impersonate an active device. A revoked device is rejected even if it still presents an old credential.
+
+`NARA_DEVICE_TOKEN` remains a development/bootstrap compatibility path for devices that have not yet migrated to per-device credentials.
+
+The firmware already supports a runtime WebSocket token and prepends `Bearer ` when needed. Production claim/provisioning should install the issued per-device credential into protected runtime storage rather than source code.
 
 ## Session handshake
 
