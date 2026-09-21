@@ -4,6 +4,22 @@ Status: accepted product direction; connectivity contract foundation implemented
 
 Last reviewed: 2026-09-21
 
+
+## Implementation checkpoint
+
+Implemented now:
+
+- phone hotspot works as ordinary saved Wi-Fi station connectivity;
+- configured firmware stays out of an endless provisioning loop when saved Wi-Fi is temporarily absent;
+- saved-network retry/recovery is automatic;
+- an authenticated browser `/phone` audio bridge exists on Nara Gateway;
+- the browser bridge has a credential distinct from ESP32 device credentials;
+- phone-only authorization cannot impersonate firmware;
+- the bridge sends/receives PCM through the same provider-neutral voice runtime;
+- a TWS routed by the phone OS can therefore act as the phone-side mic/output path.
+
+Important distinction: the implemented browser/TWS bridge requires reachability to Nara Gateway. The separate direct **ESP32 SoftAP + private local peer UI with no LAN/Internet** is still staged and must not reuse the inherited open/plain-HTTP provisioning portal for private data.
+
 ## Product goal
 
 A phone should make Nara easier to set up, carry, recover, control and use offline without becoming a permanent dependency.
