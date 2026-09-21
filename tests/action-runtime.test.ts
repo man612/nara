@@ -49,7 +49,7 @@ describe("ActionRuntime", () => {
       [definition],
       async (call) => ({
         name: call.name,
-        callId: call.callId,
+        ...(call.callId ? { callId: call.callId } : {}),
         ok: true,
         value: true
       })
@@ -91,7 +91,7 @@ describe("ActionRuntime", () => {
               observedAbort = true;
               resolve({
                 name: call.name,
-                callId: call.callId,
+                ...(call.callId ? { callId: call.callId } : {}),
                 ok: false,
                 error: "cancelled"
               });
