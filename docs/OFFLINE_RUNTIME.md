@@ -4,6 +4,25 @@ Status: accepted product direction; implementation is staged.
 
 Last reviewed: 2026-09-21
 
+
+## Implementation checkpoint
+
+Already implemented:
+
+- a configured device without a reachable saved Wi-Fi network stays in useful local idle instead of repeatedly forcing first-use provisioning;
+- saved networks keep scanning/retrying in the background;
+- a returning known network automatically reactivates the gateway;
+- Nara face, local motion reflexes, custom reaction sounds and battery policy do not require cloud inference.
+
+Still staged:
+
+- RTC-backed clock/timer/alarm UI;
+- permission-filtered offline personal capsule and deterministic local search;
+- ESP32-created secure SoftAP peer UI;
+- local-network STT/LLM/TTS.
+
+The browser phone/TWS audio bridge is a separate gateway-reachable path and should not be confused with the future no-Internet ESP32 SoftAP peer mode.
+
 ## Product requirement
 
 Nara must not become useless when Internet connectivity disappears.
