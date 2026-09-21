@@ -32,7 +32,8 @@ describe("DeviceMcpToolProvider", () => {
     await expect(provider.listTools()).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "device_get_status", effect: "read" }),
-        expect.objectContaining({ name: "device_set_volume", effect: "write" })
+        expect.objectContaining({ name: "device_set_volume", effect: "write" }),
+        expect.objectContaining({ name: "device_set_reflex", effect: "write" })
       ])
     );
 
@@ -48,6 +49,19 @@ describe("DeviceMcpToolProvider", () => {
     ).resolves.toMatchObject({
       ok: false,
       error: "volume must be an integer from 0 to 100"
+    });
+    await expect(
+      provider.callTool(
+        {
+          name: "device_set_reflex",
+          arguments: { gesture: "toss", sound: "asset:meow.ogg" },
+          callId: "bad-reflex"
+        },
+        new AbortController().signal
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      error: "gesture must be flip, shake, or spin"
     });
     expect(sent).toHaveLength(0);
   });
