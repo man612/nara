@@ -177,6 +177,36 @@ Limitation:
 
 Phone/platform support is not universal. Espressif specifically documents support on some Android 10+ devices, so DPP must be an optional fast path rather than the only setup method.
 
+## Current inherited hotspot is not a production security boundary
+
+The current `nara-firmware` dependency `78/esp-wifi-connect ~3.3.1` is useful for development and recovery UX, but its inherited configuration portal must not be confused with the future secure Nara peer surface.
+
+Upstream's current configuration AP:
+
+- starts the SoftAP with `WIFI_AUTH_OPEN`;
+- serves the configuration UI/API over plain HTTP;
+- accepts Wi-Fi SSID/password through the local web endpoint.
+
+Consequences:
+
+- do **not** expose personal capsule data, photos, messages, logs containing private data, account controls, device credentials or reusable secrets through the inherited portal;
+- do **not** describe joining that AP as proof that the phone/user is authorized;
+- do **not** expand the inherited open portal into Nara's private direct-peer product UI.
+
+The C3 direct-phone peer surface must be a separate security boundary. Minimum direction:
+
+- WPA2/WPA3-protected SoftAP where supported, with PMF configured appropriately;
+- application/session authentication in addition to Wi-Fi possession;
+- short-lived peer-mode window and credentials;
+- explicit physical action to open/reopen sensitive peer access;
+- capability-scoped local API;
+- no reusable human password embedded in firmware;
+- private content remains viewer/access filtered.
+
+Wi-Fi link encryption is not a replacement for application authorization, but an open AP is also not acceptable for private Nara data.
+
+For production Wi-Fi credential provisioning, prefer DPP or ESP-IDF Unified/Network Provisioning with Security 2 rather than sending credentials through the inherited open HTTP portal.
+
 ## Secure BLE/SoftAP provisioning
 
 For production, prefer ESP-IDF Unified Provisioning / Network Provisioning semantics over growing a proprietary provisioning protocol.
