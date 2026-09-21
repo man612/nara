@@ -123,3 +123,28 @@ Consequences:
 - connectivity capability state remains independent from interaction/face state.
 
 See `docs/PHONE_CONNECTIVITY.md`.
+
+
+## 2026-09-21 — Nara is source-available, not open source
+
+Decision:
+
+- original Nara-authored code, documentation, configuration, product design,
+  and modifications are proprietary to the repository owner;
+- public repository visibility exists for transparency, inspection, project
+  continuity, and reference, not as a grant to use or redistribute Nara;
+- original Nara material is governed by the repository's proprietary
+  source-available LICENSE / All Rights Reserved terms;
+- the Node package remains private and is marked UNLICENSED;
+- unsolicited third-party code contributions are not accepted by default;
+- third-party software keeps its own licenses and must never be swept into
+  Nara's ownership claim;
+- Nara Firmware preserves XiaoZhi-derived MIT material under a separate
+  third-party MIT notice while Nara-authored firmware additions remain under
+  Nara's proprietary terms.
+
+Reason:
+
+The project owner wants the source visible without granting the broad
+use/modification/redistribution rights that define open-source licensing.
+Using an OSI license or PolyForm Strict would grant more rights than intended.

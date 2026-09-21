@@ -1,0 +1,69 @@
+NARA PROPRIETARY SOURCE-AVAILABLE TERMS
+
+Copyright © 2026 man612. All rights reserved.
+
+This repository is source-available for transparency, inspection, and reference.
+It is not open-source software and this notice does not grant an open-source
+license.
+
+1. Ownership
+
+Except for third-party material that is expressly identified as such, the
+original source code, documentation, configuration, product design, project
+structure, and other original material in this repository (the "Nara Work")
+are proprietary to man612.
+
+2. No license granted
+
+No copyright, patent, trademark, or other intellectual-property license is
+granted to the Nara Work by publication of this repository.
+
+Except to the extent a right cannot lawfully be restricted, or to the extent
+GitHub's Terms of Service require rights necessary to operate a public
+repository on GitHub, you may not, without prior written permission from the
+copyright owner:
+
+- use or deploy the Nara Work;
+- copy or reproduce the Nara Work;
+- modify, adapt, translate, merge, or create derivative works from it;
+- publish, distribute, sublicense, sell, rent, host, or otherwise provide it
+  to another person or organization;
+- incorporate it into another product, service, firmware image, dataset, or
+  software project; or
+- remove or alter copyright, ownership, attribution, or license notices.
+
+Public visibility, cloning, indexing, or technical accessibility does not by
+itself create permission beyond rights that already exist under applicable law
+or GitHub's Terms of Service.
+
+3. Third-party material
+
+Third-party software, libraries, assets, and other materials remain governed
+by their own license terms. This notice does not remove, reduce, or replace
+rights granted by an applicable third-party license.
+
+Where third-party material is included or referenced, its license notices are
+authoritative for that material.
+
+4. Separate permission
+
+Any permission to use the Nara Work must be granted separately and explicitly
+in writing by the copyright owner. Permission for one person, project,
+version, or purpose does not imply permission for another.
+
+5. Trademarks and project identity
+
+No right is granted to use the Nara name, branding, logos, product identity,
+or other source-identifying marks in a way that suggests affiliation,
+endorsement, or ownership.
+
+6. No warranty
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE NARA WORK IS PROVIDED "AS IS"
+WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+NON-INFRINGEMENT. THE COPYRIGHT OWNER IS NOT LIABLE FOR ANY CLAIM, DAMAGES,
+OR OTHER LIABILITY ARISING FROM ACCESS TO OR USE OF THE NARA WORK.
+
+For licensing or other written permission, contact the repository owner
+through GitHub.
