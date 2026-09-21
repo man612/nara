@@ -305,3 +305,33 @@ This avoids two unsafe shortcuts:
 - treating speaker-recognition confidence as authorization for private memory.
 
 Trusted/private realtime recall should be enabled only after the session has a stronger authenticated viewer identity.
+
+
+## Remote creator-authored content
+
+Personal knowledge is runtime data, not firmware. A creator should be able to update facts they intentionally share without rebuilding or reflashing the ESP32.
+
+The first deployable HTTP edge is deliberately narrow:
+
+- bearer-authenticated;
+- bound server-side to one author/subject ID;
+- share targets restricted to a configured viewer allowlist;
+- public publishing disabled unless explicitly enabled;
+- fact IDs generated inside the contributor namespace;
+- delete/update operations cannot escape that namespace;
+- no LLM call is involved in create/update/list/delete.
+
+This is a bootstrap management surface, not the final passkey/account UI. Production deployment must terminate HTTPS before exposing it over the Internet. A later authenticated account layer can replace the bearer credential without changing the underlying PersonalContentService policy boundary.
+
+Example flow:
+
+```text
+creator phone/web
+  -> authenticated HTTPS
+  -> scoped PersonalContentService
+  -> validated PersonalMemoryStore
+  -> immediately available to authorized online recall
+  -> later selected into an offline capsule
+```
+
+The creator credential must not grant access to the recipient's unrelated private memories or to device-admin/security operations.

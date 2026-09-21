@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
-import type { IncomingMessage, Server as HttpServer } from "node:http";
+import type {
+  IncomingMessage,
+  Server as HttpServer,
+  ServerResponse
+} from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import WebSocket, { WebSocketServer } from "ws";
@@ -62,11 +66,17 @@ export type GatewayHooks = {
   ) => void | Promise<void>;
 };
 
+export type GatewayHttpHandler = (
+  request: IncomingMessage,
+  response: ServerResponse
+) => Promise<boolean>;
+
 export type GatewayOptions = {
   deviceToken?: string;
   deviceRegistry?: DeviceRegistry;
   virtualDeviceHtml?: string;
   firmwareSessionFactory?: FirmwareSessionFactory;
+  httpHandlers?: GatewayHttpHandler[];
   hooks?: GatewayHooks;
 };
 
@@ -147,6 +157,23 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ ok: true, service: "nara" }));
       return;
+    }
+
+    for (const handler of options.httpHandlers ?? []) {
+      try {
+        if (await handler(req, res)) {
+          return;
+        }
+      } catch (error) {
+        console.error("[http] extension handler failed", error);
+        if (!res.headersSent) {
+          res.writeHead(500, { "content-type": "application/json" });
+        }
+        if (!res.writableEnded) {
+          res.end(JSON.stringify({ ok: false, error: "internal error" }));
+        }
+        return;
+      }
     }
 
     res.writeHead(404);
