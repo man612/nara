@@ -18,11 +18,15 @@ describe("HermesAgentClient", () => {
       init?: RequestInit
     ) => {
       const url = String(input);
+      const authorization =
+        new Headers(init?.headers).get("authorization") ?? undefined;
+      const body =
+        typeof init?.body === "string" ? init.body : undefined;
       requests.push({
         url,
         method: init?.method ?? "GET",
-        authorization: new Headers(init?.headers).get("authorization") ?? undefined,
-        body: typeof init?.body === "string" ? init.body : undefined
+        ...(authorization ? { authorization } : {}),
+        ...(body ? { body } : {})
       });
 
       if (url.endsWith("/v1/runs")) {
