@@ -242,3 +242,48 @@ References:
 - https://living.ai/docs/emo/interaction/physical/
 - https://living.ai/support/
 - https://keyirobot.com/products/petbot
+
+
+## Phone connectivity, commissioning and direct-peer UX
+
+Purpose: choose how Nara should connect to phones without making Bluetooth, a cloud app or Internet connectivity a permanent dependency.
+
+Projects and references reviewed:
+
+- Espressif ESP-IDF Unified Provisioning / Network Provisioning;
+- ESP-IDF Wi-Fi Easy Connect (DPP) for ESP32-S3;
+- ESP-IDF Wi-Fi/BLE RF coexistence guidance;
+- ESP-IDF SoftAP and SoftAP+Station examples;
+- ESP RainMaker firmware and phone provisioning flows;
+- ESPHome provisioning, Improv BLE and factory-project patterns;
+- Matter/connectedhomeip commissioning flows and esp-matter lifecycle behavior.
+
+Useful findings:
+
+- ESP-IDF supports BLE GATT or SoftAP+HTTP provisioning and Security 2 based on SRP6a + AES-256-GCM.
+- ESP32-S3 supports DPP enrollee mode using a displayed QR code; compatible phones can provision Wi-Fi without a Nara app.
+- RainMaker treats QR as onboarding metadata and then performs the actual transfer over BLE or SoftAP.
+- RainMaker defaults to BLE but retains SoftAP as a supported alternative.
+- ESPHome exposes BLE Improv and captive-portal/fallback-AP patterns, but explicitly warns that BLE memory pressure can collide with heavy voice/audio workloads.
+- ESP-IDF documents that Wi-Fi and BLE share the ESP32-S3 2.4 GHz radio; supported coexistence does not mean simultaneous use is free.
+- Matter uses BLE as a commissioning channel and common esp-matter configurations release BLE resources after commissioning when persistent BLE is not required.
+- ESP-IDF's SoftAP+Station examples prove the chip can support both roles, but Nara should not keep a peer AP exposed continuously just because APSTA exists.
+
+Decision:
+
+Use Wi-Fi as Nara's primary runtime data plane. Phone hotspot is ordinary Wi-Fi station connectivity. The first direct-phone/no-Internet experience is an on-demand SoftAP with an authenticated local web UI, so no native app is required. BLE remains a short-lived/on-demand provisioning/control transport and should be deinitialized or dormant during normal voice operation until real 1.85B measurements justify otherwise. DPP is an optional Android-friendly fast path. Production provisioning should migrate deliberately toward Unified/Network Provisioning Security 2 instead of expanding the inherited proprietary setup path.
+
+References:
+
+- https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/provisioning/provisioning.html
+- https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/network/esp_dpp.html
+- https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/coexist.html
+- https://github.com/espressif/esp-idf/tree/master/examples/wifi
+- https://docs.rainmaker.espressif.com/docs/dev/phone-app/home-app/home-app-device-setup/
+- https://docs.rainmaker.espressif.com/docs/dev/firmware/firmware_dev_tips/
+- https://github.com/espressif/esp-rainmaker-home
+- https://esphome.io/components/provisioning/
+- https://esphome.io/components/esp32_improv/
+- https://github.com/esphome/esphome-project-template
+- https://github.com/project-chip/connectedhomeip
+- https://github.com/espressif/esp-matter
