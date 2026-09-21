@@ -70,3 +70,14 @@ Before committing:
 - run focused tests, then the full test suite;
 - avoid unrelated refactors;
 - never commit `.env`, credentials, recordings, or personal memory data.
+
+
+## Repository ownership
+
+- Nara-authored material is proprietary source-available software.
+- Do not describe Nara as open source.
+- Do not replace or weaken LICENSE without explicit owner instruction.
+- Third-party material remains under its own license and must stay clearly
+  separated from Nara's ownership claim.
+- Unsolicited external contributions are not accepted by default; read
+  CONTRIBUTING.md before merging third-party work.
