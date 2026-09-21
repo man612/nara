@@ -5,6 +5,7 @@ import {
   normalizeGeminiLiveUsage,
   type GeminiSocketFactory
 } from "../src/providers/voice/gemini-live.js";
+import type { ToolDefinition } from "../src/actions/contracts.js";
 import type { VoiceSessionEvent } from "../src/contracts/providers.js";
 
 class FakeGeminiSocket extends EventEmitter {
@@ -47,7 +48,8 @@ function createHarness() {
 
 async function connectHarness(
   factory: GeminiSocketFactory,
-  sockets: FakeGeminiSocket[]
+  sockets: FakeGeminiSocket[],
+  tools: ToolDefinition[] = []
 ) {
   const provider = new GeminiLiveVoiceProvider("gemini-live", {
     apiKey: "secret key",
@@ -56,7 +58,7 @@ async function connectHarness(
     socketFactory: factory
   });
 
-  const pending = provider.connect();
+  const pending = provider.connect(tools.length > 0 ? { tools } : undefined);
   await Promise.resolve();
 
   const socket = sockets[0]!;
@@ -96,6 +98,65 @@ describe("Gemini Live provider", () => {
           contextWindowCompression: {
             slidingWindow: {}
           }
+        }
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  it("declares Nara tools and sends provider-neutral results back to Gemini", async () => {
+    const harness = createHarness();
+    const tools: ToolDefinition[] = [
+      {
+        name: "device_set_volume",
+        description: "Set speaker volume.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            volume: { type: "integer", minimum: 0, maximum: 100 }
+          },
+          required: ["volume"]
+        },
+        effect: "write"
+      }
+    ];
+    const { session, socket } = await connectHarness(
+      harness.factory,
+      harness.sockets,
+      tools
+    );
+
+    try {
+      const setup = JSON.parse(socket.sent[0]!);
+      expect(setup.setup.tools).toEqual([
+        {
+          functionDeclarations: [
+            {
+              name: "device_set_volume",
+              description: "Set speaker volume.",
+              parameters: tools[0]!.inputSchema
+            }
+          ]
+        }
+      ]);
+
+      await session.sendToolResult?.({
+        name: "device_set_volume",
+        callId: "call-volume",
+        ok: true,
+        value: true
+      });
+
+      expect(JSON.parse(socket.sent.at(-1)!)).toEqual({
+        toolResponse: {
+          functionResponses: [
+            {
+              name: "device_set_volume",
+              id: "call-volume",
+              response: { result: true }
+            }
+          ]
         }
       });
     } finally {
@@ -196,6 +257,11 @@ describe("Gemini Live provider", () => {
           ]
         }
       });
+      socket.message({
+        toolCallCancellation: {
+          ids: ["call-1"]
+        }
+      });
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -240,6 +306,10 @@ describe("Gemini Live provider", () => {
         name: "set_light",
         arguments: { on: true },
         callId: "call-1"
+      });
+      expect(events).toContainEqual({
+        type: "tool.cancel",
+        callIds: ["call-1"]
       });
     } finally {
       unsubscribe();
