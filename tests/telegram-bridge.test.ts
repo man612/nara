@@ -1,6 +1,10 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { FirmwareVoiceControlRegistry } from "../src/device/voice-control.js";
 import { TelegramBridge } from "../src/telegram/bridge.js";
+import { RemoteInbox } from "../src/remote/inbox.js";
 
 describe("TelegramBridge", () => {
   it("ignores unauthorized users and routes allowlisted ask text", async () => {
@@ -89,7 +93,7 @@ describe("TelegramBridge", () => {
     await bridge.pollOnce();
     expect(sendText).toHaveBeenCalledWith("halo Nara");
 
-    await bridge.handleOutputTranscript("Halo dari Nara", true);
+    await bridge.handleOutputTranscript("s1", "Halo dari Nara", true);
     expect(
       responses.some(
         (entry) =>
@@ -98,6 +102,78 @@ describe("TelegramBridge", () => {
           entry.body.text === "Halo dari Nara"
       )
     ).toBe(true);
+  });
+
+  it("queues an allowlisted /ask for an idle target device", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "nara-telegram-inbox-"));
+    try {
+      const inbox = await RemoteInbox.open({
+        filePath: join(dir, "remote.json"),
+        ttlMs: 120_000,
+        leaseMs: 30_000
+      });
+      const registry = new FirmwareVoiceControlRegistry();
+      let polled = false;
+      const sent: Array<Record<string, unknown>> = [];
+      const bridge = new TelegramBridge({
+        botToken: "bot-token",
+        allowedUserIds: [123],
+        voiceControls: registry,
+        targetDeviceId: "device-1",
+        remoteInbox: inbox,
+        fetchImpl: (async (input, init) => {
+          const method = String(input).split("/").pop()!;
+          const body = JSON.parse(String(init?.body ?? "{}")) as Record<
+            string,
+            unknown
+          >;
+          if (method === "getUpdates") {
+            const result = polled
+              ? []
+              : [
+                  {
+                    update_id: 1,
+                    message: {
+                      message_id: 11,
+                      text: "/ask halo dari jauh",
+                      from: { id: 123 },
+                      chat: { id: 20 }
+                    }
+                  }
+                ];
+            polled = true;
+            return new Response(JSON.stringify({ ok: true, result }), {
+              status: 200,
+              headers: { "content-type": "application/json" }
+            });
+          }
+          sent.push(body);
+          return new Response(JSON.stringify({ ok: true, result: {} }), {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          });
+        }) as typeof fetch
+      });
+
+      await bridge.pollOnce();
+      expect(inbox.pendingCount("device-1")).toBe(1);
+      await expect(inbox.poll("device-1")).resolves.toMatchObject({
+        kind: "voice",
+        mode: "ask"
+      });
+      const claimed = await inbox.claimLeasedVoice("device-1");
+      expect(claimed).toMatchObject({
+        prompt: "halo dari jauh",
+        replyChatId: 20
+      });
+      expect(
+        sent.some((body) =>
+          String(body.text ?? "").includes("sedang idle")
+        )
+      ).toBe(true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("uses local device_notify for /notify without voice text injection", async () => {
