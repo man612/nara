@@ -99,6 +99,10 @@ export class TelegramBridge {
     this.pendingSessionChats.set(sessionId, chatId);
   }
 
+  cancelExpectedReply(sessionId: string): void {
+    this.pendingSessionChats.delete(sessionId);
+  }
+
   async handleOutputTranscript(
     sessionId: string,
     text: string,
