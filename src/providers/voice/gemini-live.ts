@@ -1,7 +1,12 @@
 import WebSocket, { type RawData } from "ws";
 import type {
+  ToolDefinition,
+  ToolResult
+} from "../../actions/contracts.js";
+import type {
   AudioChunk,
   ProviderUsage,
+  VoiceConnectOptions,
   VoiceEventHandler,
   VoiceProvider,
   VoiceSession,
@@ -81,6 +86,9 @@ type GeminiServerMessage = {
       args?: unknown;
     }>;
   };
+  toolCallCancellation?: {
+    ids?: string[];
+  };
 };
 
 function defaultSocketFactory(url: string): GeminiSocket {
@@ -139,13 +147,14 @@ export class GeminiLiveVoiceProvider implements VoiceProvider {
     this.options = options;
   }
 
-  async connect(): Promise<VoiceSession> {
-    return GeminiLiveVoiceSession.connect(this.options);
+  async connect(options: VoiceConnectOptions = {}): Promise<VoiceSession> {
+    return GeminiLiveVoiceSession.connect(this.options, options.tools ?? []);
   }
 }
 
 class GeminiLiveVoiceSession implements VoiceSession {
   private readonly options: GeminiLiveOptions;
+  private readonly tools: ToolDefinition[];
   private readonly socketFactory: GeminiSocketFactory;
   private readonly handlers = new Set<VoiceEventHandler>();
   private socket: GeminiSocket | null = null;
@@ -158,13 +167,20 @@ class GeminiLiveVoiceSession implements VoiceSession {
   private serverEventChain: Promise<void> = Promise.resolve();
   private readonly outbox: string[] = [];
 
-  private constructor(options: GeminiLiveOptions) {
+  private constructor(
+    options: GeminiLiveOptions,
+    tools: ToolDefinition[]
+  ) {
     this.options = options;
+    this.tools = tools;
     this.socketFactory = options.socketFactory ?? defaultSocketFactory;
   }
 
-  static async connect(options: GeminiLiveOptions): Promise<GeminiLiveVoiceSession> {
-    const session = new GeminiLiveVoiceSession(options);
+  static async connect(
+    options: GeminiLiveOptions,
+    tools: ToolDefinition[]
+  ): Promise<GeminiLiveVoiceSession> {
+    const session = new GeminiLiveVoiceSession(options, tools);
     await session.openSocket(null, true);
     return session;
   }
@@ -218,6 +234,33 @@ class GeminiLiveVoiceSession implements VoiceSession {
     this.sendJson({
       realtimeInput: {
         audioStreamEnd: true
+      }
+    });
+  }
+
+  async sendToolResult(result: ToolResult): Promise<void> {
+    this.assertOpen();
+
+    const response: Record<string, unknown> = result.ok
+      ? { result: result.value ?? null }
+      : { error: result.error ?? "Tool execution failed" };
+
+    if (result.scheduling) {
+      response.scheduling =
+        result.scheduling === "when_idle"
+          ? "WHEN_IDLE"
+          : result.scheduling.toUpperCase();
+    }
+
+    this.sendJson({
+      toolResponse: {
+        functionResponses: [
+          {
+            name: result.name,
+            ...(result.callId ? { id: result.callId } : {}),
+            response
+          }
+        ]
       }
     });
   }
@@ -390,6 +433,20 @@ class GeminiLiveVoiceSession implements VoiceSession {
     if (this.options.outputTranscription) {
       setup.outputAudioTranscription = {};
     }
+    if (this.tools.length > 0) {
+      setup.tools = [
+        {
+          functionDeclarations: this.tools.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.inputSchema,
+            ...(tool.behavior === "non_blocking"
+              ? { behavior: "NON_BLOCKING" }
+              : {})
+          }))
+        }
+      ];
+    }
 
     return { setup };
   }
@@ -478,6 +535,14 @@ class GeminiLiveVoiceSession implements VoiceSession {
       };
       if (call.id) event.callId = call.id;
       await this.emit(event);
+    }
+
+    const cancelledIds = message.toolCallCancellation?.ids ?? [];
+    if (cancelledIds.length > 0) {
+      await this.emit({
+        type: "tool.cancel",
+        callIds: cancelledIds
+      });
     }
   }
 
