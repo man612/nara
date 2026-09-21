@@ -279,10 +279,8 @@ export class RemoteInbox {
       return;
     }
     this.assertCapacity(item.deviceId);
-    this.items.unshift({
-      ...item,
-      leaseUntil: undefined
-    });
+    const { leaseUntil: _leaseUntil, ...requeued } = item;
+    this.items.unshift(requeued);
     await this.persist();
   }
 
