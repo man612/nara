@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { createGatewayServer } from "../src/gateway.js";
+import { DeviceRegistry } from "../src/device/registry.js";
+import {
+  createGatewayServer,
+  isGatewayDeviceAuthorized
+} from "../src/gateway.js";
 import {
   GitHubReleaseOtaCatalog,
   type OtaCatalog,
@@ -203,6 +207,88 @@ describe("OTA HTTP edge", () => {
         force: 1
       });
       expect(seenChannels).toEqual(["stable", "beta"]);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
+  it("requires an active device's credential while preserving bootstrap policy", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "nara-ota-auth-"));
+    directories.push(directory);
+    const registry = await DeviceRegistry.open({
+      filePath: join(directory, "devices.json")
+    });
+    await registry.registerUnclaimedDevice({ deviceId: "device-rizma" });
+    const claim = await registry.beginClaim("device-rizma");
+    await registry.approveClaimFromAccount({
+      claimId: claim.claimId,
+      claimToken: claim.claimToken,
+      accountId: "account:rizma"
+    });
+    await registry.confirmPhysicalClaim({
+      claimId: claim.claimId,
+      deviceId: "device-rizma"
+    });
+    const credential = await registry.completeClaim({
+      claimId: claim.claimId,
+      deviceId: "device-rizma"
+    });
+
+    const channels = await DeviceUpdateChannels.open();
+    const catalog: OtaCatalog = {
+      async resolve(input) {
+        return {
+          version: "0.2.0",
+          channel: "stable",
+          board: input.board,
+          firmwareUrl: "https://downloads.invalid/stable.bin"
+        };
+      }
+    };
+
+    const { server } = createGatewayServer({
+      httpHandlers: [
+        createOtaHttpHandler({
+          catalog,
+          channels,
+          authorizeDevice: (request) =>
+            isGatewayDeviceAuthorized(request, {
+              deviceRegistry: registry,
+              deviceToken: "bootstrap-token"
+            })
+        })
+      ]
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address() as AddressInfo;
+    const url = `http://127.0.0.1:${address.port}/api/ota/check`;
+
+    try {
+      const headers = {
+        "device-id": "device-rizma",
+        "user-agent": "esp32-s3-touch-lcd-1.85b/0.1.0"
+      };
+
+      const missing = await fetch(url, { headers });
+      expect(missing.status).toBe(401);
+
+      const fleetToken = await fetch(url, {
+        headers: {
+          ...headers,
+          authorization: "Bearer bootstrap-token"
+        }
+      });
+      expect(fleetToken.status).toBe(401);
+
+      const authenticated = await fetch(url, {
+        headers: {
+          ...headers,
+          authorization: `Bearer ${credential.credential}`
+        }
+      });
+      expect(authenticated.status).toBe(200);
     } finally {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve()))
