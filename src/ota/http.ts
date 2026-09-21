@@ -122,6 +122,7 @@ export function createOtaHttpHandler(options: {
   catalog: OtaCatalog;
   channels: DeviceUpdateChannels;
   adminToken?: string;
+  authorizeDevice?: (request: IncomingMessage) => boolean;
   now?: () => number;
 }): GatewayHttpHandler {
   if (options.adminToken && options.adminToken.trim().length < 24) {
@@ -132,6 +133,11 @@ export function createOtaHttpHandler(options: {
     const url = new URL(req.url ?? "/", "http://nara.local");
 
     if (url.pathname === CHECK_PATH && (req.method === "POST" || req.method === "GET")) {
+      if (options.authorizeDevice && !options.authorizeDevice(req)) {
+        json(res, 401, { error: "unauthorized device" });
+        return true;
+      }
+
       const identity = parseUserAgent(header(req.headers["user-agent"]));
       if (!identity) {
         json(res, 400, { error: "board/version user-agent required" });
