@@ -135,7 +135,7 @@ describe("Gemini Live provider", () => {
             {
               name: "device_set_volume",
               description: "Set speaker volume.",
-              parameters: tools[0]!.inputSchema
+              parametersJsonSchema: tools[0]!.inputSchema
             }
           ]
         }
