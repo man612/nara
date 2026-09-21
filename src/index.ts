@@ -7,6 +7,8 @@ import { DeviceRegistry } from "./device/registry.js";
 import { FirmwareVoiceBridge } from "./device/voice-bridge.js";
 import type { PersonDirectory } from "./identity/directory.js";
 import { loadPersonDirectoryFile } from "./identity/file-directory.js";
+import { HumanCredentialRegistry } from "./identity/human-credentials.js";
+import { createHumanAuthHttpHandler } from "./identity/human-auth-http.js";
 import { SpeakerIdentityService } from "./identity/speaker.js";
 import { HttpSpeakerIdentityProvider } from "./identity/speaker-http.js";
 import { SpeakerTurnRecognizer } from "./identity/speaker-turn.js";
@@ -128,14 +130,14 @@ async function createPhoneVoiceFactory(
     voiceProvider,
     ...(voiceMemory || mediaTools
       ? {
-          createToolProviders: () => [
+          createToolProviders: (context) => [
             ...(voiceMemory
               ? [
-                  // A phone bridge bearer token authorizes the transport, but
-                  // is not a human account/passkey. Keep personal recall at
-                  // guest/public scope until strong viewer auth is bound.
+                  // The transport token and the human viewer credential are
+                  // separate. Without an authenticated viewer session, phone
+                  // voice remains guest/public just like physical firmware.
                   new PersonalMemoryToolProvider(voiceMemory.store, {
-                    viewerId: "person:guest",
+                    viewerId: context.viewerId ?? "person:guest",
                     subjectId: voiceMemory.subjectId
                   })
                 ]
@@ -176,9 +178,11 @@ async function main(): Promise<void> {
       : undefined;
 
   const peopleFile = process.env.NARA_PEOPLE_FILE;
+  const personDirectory = peopleFile
+    ? await loadPersonDirectoryFile(peopleFile)
+    : undefined;
   const speakerEndpoint = process.env.NARA_SPEAKER_ID_URL;
   const speakerConfigPresent =
-    peopleFile !== undefined ||
     speakerEndpoint !== undefined ||
     process.env.NARA_SPEAKER_MIN_CONFIDENCE !== undefined ||
     process.env.NARA_SPEAKER_MIN_MARGIN !== undefined ||
@@ -186,13 +190,13 @@ async function main(): Promise<void> {
 
   let speakerRuntime: SpeakerRuntime | undefined;
   if (speakerConfigPresent) {
-    if (!peopleFile || !speakerEndpoint) {
+    if (!personDirectory || !speakerEndpoint) {
       throw new Error(
         "Speaker identity requires NARA_PEOPLE_FILE and NARA_SPEAKER_ID_URL"
       );
     }
 
-    const directory = await loadPersonDirectoryFile(peopleFile);
+    const directory = personDirectory;
     const provider = new HttpSpeakerIdentityProvider(speakerEndpoint, {
       ...(process.env.NARA_SPEAKER_SERVICE_TOKEN
         ? { bearerToken: process.env.NARA_SPEAKER_SERVICE_TOKEN }
@@ -235,6 +239,23 @@ async function main(): Promise<void> {
       })
     );
   }
+
+  const humanAdminToken = process.env.NARA_HUMAN_AUTH_ADMIN_TOKEN;
+  const humanRegistryFile =
+    process.env.NARA_HUMAN_CREDENTIAL_REGISTRY_FILE ??
+    "data/human-credentials.json";
+  const humanAuthConfigured =
+    humanAdminToken !== undefined ||
+    process.env.NARA_HUMAN_CREDENTIAL_REGISTRY_FILE !== undefined;
+  if (humanAuthConfigured && (!humanAdminToken || !personDirectory)) {
+    throw new Error(
+      "Human viewer auth requires NARA_HUMAN_AUTH_ADMIN_TOKEN and NARA_PEOPLE_FILE"
+    );
+  }
+  const humanRegistry =
+    humanAuthConfigured && humanAdminToken && personDirectory
+      ? await HumanCredentialRegistry.open({ filePath: humanRegistryFile })
+      : undefined;
 
   const firmwareSessionFactory = await createFirmwareVoiceFactory(
     voiceMemory,
@@ -283,6 +304,16 @@ async function main(): Promise<void> {
   }
 
   const httpHandlers: NonNullable<GatewayOptions["httpHandlers"]> = [];
+  if (humanRegistry && humanAdminToken && personDirectory) {
+    httpHandlers.push(
+      createHumanAuthHttpHandler({
+        registry: humanRegistry,
+        directory: personDirectory,
+        adminToken: humanAdminToken
+      })
+    );
+  }
+
   if (contentToken && contentSubjectId && personalMemoryStore) {
     const contentService = new PersonalContentService(personalMemoryStore, {
       subjectId: contentSubjectId,
@@ -332,7 +363,25 @@ async function main(): Promise<void> {
     deviceRegistry,
     ...(firmwareSessionFactory ? { firmwareSessionFactory } : {}),
     ...(phoneToken && phoneSessionFactory
-      ? { phoneToken, phoneSessionFactory }
+      ? {
+          phoneToken,
+          phoneSessionFactory,
+          ...(humanRegistry
+            ? {
+                resolvePhoneViewerSession: (sessionToken: string) => {
+                  const viewer = humanRegistry.resolveSession(sessionToken);
+                  return viewer
+                    ? {
+                        viewerId: viewer.personId,
+                        ...(viewer.accountId
+                          ? { accountId: viewer.accountId }
+                          : {})
+                      }
+                    : undefined;
+                }
+              }
+            : {})
+        }
       : {}),
     ...(httpHandlers.length > 0 ? { httpHandlers } : {})
   };
@@ -344,6 +393,11 @@ async function main(): Promise<void> {
     console.log(`Device registry:  ${deviceRegistryFile}`);
     if (phoneToken && phoneSessionFactory) {
       console.log(`Phone audio:      http://localhost:${port}/phone`);
+    }
+    if (humanRegistry) {
+      console.log(
+        `Human viewer auth: credentials=${humanRegistryFile} short-lived phone sessions enabled`
+      );
     }
     if (voiceMemory) {
       console.log(
