@@ -171,6 +171,20 @@ export class FilePersonalMemoryStore implements PersonalMemoryStore {
     await this.persist();
   }
 
+  async get(id: string): Promise<PersonalMemoryFact | undefined> {
+    await this.ensureLoaded();
+    const fact = this.facts!.get(id);
+    return fact ? structuredClone(fact) : undefined;
+  }
+
+  async listBySubject(subjectId: string): Promise<PersonalMemoryFact[]> {
+    await this.ensureLoaded();
+    return [...this.facts!.values()]
+      .filter((fact) => fact.subjectId === subjectId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map((fact) => structuredClone(fact));
+  }
+
   async remove(id: string): Promise<boolean> {
     await this.ensureLoaded();
     const removed = this.facts!.delete(id);
