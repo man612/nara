@@ -65,7 +65,42 @@ const PersistedMemorySchema = z.object({
   facts: z.array(PersonalMemoryFactSchema)
 });
 
-type PersistedMemory = z.infer<typeof PersistedMemorySchema>;
+type ValidatedPersonalMemoryFact = z.infer<typeof PersonalMemoryFactSchema>;
+type PersistedMemory = {
+  version: 1;
+  facts: PersonalMemoryFact[];
+};
+
+function normalizedFact(value: unknown): PersonalMemoryFact {
+  const parsed: ValidatedPersonalMemoryFact =
+    PersonalMemoryFactSchema.parse(value);
+
+  return {
+    id: parsed.id,
+    subjectId: parsed.subjectId,
+    kind: parsed.kind,
+    text: parsed.text,
+    source: {
+      type: parsed.source.type,
+      ...(parsed.source.reference !== undefined
+        ? { reference: parsed.source.reference }
+        : {})
+    },
+    sensitivity: parsed.sensitivity,
+    createdAt: parsed.createdAt,
+    updatedAt: parsed.updatedAt,
+    ...(parsed.tags !== undefined ? { tags: parsed.tags } : {}),
+    ...(parsed.confidence !== undefined
+      ? { confidence: parsed.confidence }
+      : {}),
+    ...(parsed.shareWith !== undefined
+      ? { shareWith: parsed.shareWith }
+      : {}),
+    ...(parsed.expiresAt !== undefined
+      ? { expiresAt: parsed.expiresAt }
+      : {})
+  };
+}
 
 const DEFAULT_RECALL_LIMIT = 5;
 const MAX_RECALL_LIMIT = 20;
@@ -131,7 +166,7 @@ export class FilePersonalMemoryStore implements PersonalMemoryStore {
 
   async upsert(fact: PersonalMemoryFact): Promise<void> {
     await this.ensureLoaded();
-    const validated = PersonalMemoryFactSchema.parse(fact);
+    const validated = normalizedFact(fact);
     this.facts!.set(validated.id, structuredClone(validated));
     await this.persist();
   }
@@ -192,7 +227,7 @@ export class FilePersonalMemoryStore implements PersonalMemoryStore {
       this.facts = new Map(
         parsed.data.facts.map((fact) => [
           fact.id,
-          structuredClone(fact)
+          structuredClone(normalizedFact(fact))
         ] as const)
       );
     } catch (error) {
