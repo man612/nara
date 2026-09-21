@@ -20,18 +20,22 @@
   <h1>Nara — Phone Audio Bridge</h1>
   <p>Sambungkan TWS ke HP dan jadikan TWS sebagai input/output audio HP. Halaman ini meneruskan mic HP/TWS ke Nara dan memutar jawaban Nara lewat output audio HP/TWS.</p>
   <label>Phone bridge token
-    <input id="token" type="password" autocomplete="off" placeholder="token dari server Nara">
+    <input id="token" type="password" autocomplete="off" placeholder="token transport dari server Nara">
+  </label>
+  <label>Viewer credential (opsional)
+    <input id="viewerCredential" type="password" autocomplete="off" placeholder="credential manusia untuk memory trusted/private">
   </label>
   <div class="row">
     <button id="start">Mulai</button>
     <button id="stop" disabled>Berhenti</button>
   </div>
-  <small>Mic browser membutuhkan HTTPS (atau localhost). Token tidak dimasukkan ke URL; token dikirim sebagai WebSocket subprotocol.</small>
+  <small>Mic browser membutuhkan HTTPS (atau localhost). Transport token tidak dimasukkan ke URL. Viewer credential ditukar dulu menjadi session token singkat; tanpa credential, sesi tetap guest/public.</small>
   <div id="log">Belum terhubung.</div>
 </main>
 <script>
 (() => {
   const tokenInput = document.querySelector("#token");
+  const viewerCredentialInput = document.querySelector("#viewerCredential");
   const startButton = document.querySelector("#start");
   const stopButton = document.querySelector("#stop");
   const log = document.querySelector("#log");
@@ -58,6 +62,28 @@
     for (const value of bytes) binary += String.fromCharCode(value);
     return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
+  async function mintViewerSession(credential) {
+    if (!credential) return undefined;
+    const response = await fetch("/api/identity/session", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer " + credential,
+        "content-type": "application/json"
+      },
+      body: "{}",
+      cache: "no-store"
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok || !payload.sessionToken) {
+      throw new Error(payload.error || "viewer authentication failed");
+    }
+    status(
+      "Viewer terautentikasi: " +
+      (payload.viewer?.displayName || payload.viewer?.personId || "known person")
+    );
+    return payload.sessionToken;
+  }
+
 
   function framePcm16(samples, sampleRate) {
     const body = new Int16Array(samples.length);
@@ -201,11 +227,16 @@
     }
     startButton.disabled = true;
     try {
+      const viewerSession = await mintViewerSession(
+        viewerCredentialInput.value.trim()
+      );
       await startCapture();
       const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+      const protocols = ["nara-phone-v1", "auth." + base64url(token)];
+      if (viewerSession) protocols.push("viewer." + viewerSession);
       socket = new WebSocket(
         scheme + "//" + location.host + "/device",
-        ["nara-phone-v1", "auth." + base64url(token)]
+        protocols
       );
       socket.binaryType = "arraybuffer";
       socket.onopen = () => {
