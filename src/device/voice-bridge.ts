@@ -128,9 +128,6 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     this.unsubscribeVoice();
     this.pacer.close();
 
-    this.actions?.cancel(
-      [...this.toolTasks].map((_task, index) => `session-close-${index}`)
-    );
     await this.actions?.close();
 
     await this.voiceEventChain.catch(() => undefined);
