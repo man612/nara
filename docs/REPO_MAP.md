@@ -19,6 +19,14 @@ Read this before broad code search.
 - `src/contracts/providers.ts` — voice/brain/search/memory contracts and normalized usage.
 - `src/provider-registry.ts` — provider construction and fallback composition.
 
+## Personal memory
+
+- `src/memory/personal.ts` — first local personal-memory adapter: subject/viewer-aware access filtering, bounded lexical recall, expiry, edit/delete, and file persistence.
+- `tests/personal-memory.test.ts` — privacy, partner/guest, persistence, expiry, edit/delete, and recall-limit coverage.
+- `data/` — intended runtime-private state boundary; gitignored and never a source file directory.
+
+The current file adapter is a replaceable first implementation, not permission to bypass the memory boundary elsewhere.
+
 ## Device edge
 
 - `src/device/firmware-wire.ts` — physical firmware hello/auth helpers and WebSocket Opus v1/v2/v3 framing.
@@ -79,5 +87,6 @@ Read this before broad code search.
 - `tests/provider-config.test.ts`
 - `tests/provider-usage.test.ts`
 - `tests/fallback-brain.test.ts`
+- `tests/personal-memory.test.ts`
 
 Agents should inspect only the files relevant to the current issue before expanding scope.
