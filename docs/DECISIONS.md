@@ -104,3 +104,22 @@ Consequences:
 - speech is optional enrichment and should be rare enough not to become annoying;
 - thresholds are calibrated on the real 1.85B and final enclosure;
 - body-wide petting outside the touchscreen is not promised without an added touch sensor.
+
+
+## 2026-09-21 — Phone connectivity uses Wi-Fi as the main data plane
+
+**Status:** accepted
+
+Nara should work with a phone without making a native mobile app or persistent Bluetooth connection a first-release dependency.
+
+Consequences:
+
+- normal operation and phone tethering both use Wi-Fi station mode;
+- direct no-Internet phone access starts with an on-demand SoftAP + authenticated local web UI;
+- Bluetooth LE is temporary/on-demand for provisioning, discovery, small control/sync, or peer negotiation rather than the main realtime audio/data path;
+- BLE should be released/dormant during normal voice operation unless real hardware measurements justify keeping it active;
+- DPP/Wi-Fi Easy Connect is an optional fast provisioning path on compatible phones, not the only setup route;
+- production provisioning should converge on secure ESP-IDF Unified/Network Provisioning semantics with per-device proof of possession;
+- connectivity capability state remains independent from interaction/face state.
+
+See `docs/PHONE_CONNECTIVITY.md`.
