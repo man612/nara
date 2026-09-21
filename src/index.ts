@@ -28,8 +28,8 @@ async function createFirmwareVoiceFactory(): Promise<
       );
     },
     onToolCall: (session, event) => {
-      console.warn(
-        `[firmware:${session.sessionId}] voice tool call is not wired yet: ${event.name}`
+      console.log(
+        `[firmware:${session.sessionId}] tool call name=${event.name} id=${event.callId ?? "?"}`
       );
     }
   });

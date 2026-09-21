@@ -21,8 +21,8 @@ Gemini     DeepSeek   profiles
 future     Hermes     emotion
 adapters   OpenRouter memory
         |
-      tools
- search / browser / reminders / MCP
+   Action Runtime
+ device / search / memory / agents / MCP
 ```
 
 The realtime voice path stays thin. Slow web search, browser work, long reasoning and automation are delegated instead of blocking microphone/speaker streaming.
@@ -31,6 +31,7 @@ The realtime voice path stays thin. Slow web search, browser work, long reasonin
 
 - Voice: Gemini Live is implemented; GPT-Live, Pipecat-backed runtimes, and a cheap chained STT -> brain -> TTS path are planned behind the same contract.
 - Brain: any OpenAI-compatible endpoint; DeepSeek, Hermes, OpenRouter and local gateways can share one adapter.
+- Actions: provider-neutral routing/cancellation; the first physical-device tools execute through the firmware's MCP compatibility layer.
 - Agent/tools: Hermes Agent is optional and can run on a VPS or managed service.
 - Search: Hermes, SearXNG, DDGS, Brave, provider-native search, or future adapters.
 - Memory: start local; PostgreSQL/pgvector can be added when deployment needs it.
@@ -44,7 +45,9 @@ Nara does not assume a permanent host. It can run on a laptop, home server, gene
 
 The physical realtime voice path is wired end-to-end at the gateway layer: firmware Opus framing, session-scoped Opus/PCM transcoding, a resumable Gemini Live adapter, bounded device playback pacing, interruption handling, provider-neutral session lifecycle, and connect-time voice-provider fallback routing are implemented and covered by automated tests including a real-Opus WebSocket vertical slice.
 
+Nara also has a provider-neutral Action Runtime. Gemini Live can receive compact Nara tool declarations, emit tool calls, execute safe physical actions through the firmware's legacy MCP server, receive results, and cancel active calls by ID. The first device aliases cover status and speaker volume, with an end-to-end fake-ESP32 WebSocket integration test.
+
 The standalone firmware also has the portable Nara face engine integrated into the Waveshare runtime.
 
-Next milestones are hardware-in-the-loop voice validation, tool execution from realtime provider calls, additional production voice adapters, memory/search integration, and later in-session provider recovery where it is technically safe.
+Next milestones are hardware-in-the-loop voice/action validation, local memory, search, optional Hermes delegation, additional production voice adapters, and later in-session provider recovery where it is technically safe.
 

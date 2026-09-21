@@ -69,6 +69,7 @@ class FakeCodecFactory implements AudioCodecFactory {
 class FakeVoiceSession implements VoiceSession {
   readonly handlers = new Set<VoiceEventHandler>();
   readonly input: AudioChunk[] = [];
+  readonly toolResults: unknown[] = [];
   interruptCalls = 0;
   streamEndCalls = 0;
   closed = false;
@@ -82,6 +83,10 @@ class FakeVoiceSession implements VoiceSession {
 
   async endAudioStream(): Promise<void> {
     this.streamEndCalls += 1;
+  }
+
+  async sendToolResult(result: unknown): Promise<void> {
+    this.toolResults.push(result);
   }
 
   async interrupt(): Promise<void> {
@@ -113,7 +118,7 @@ class FakeVoiceProvider implements VoiceProvider {
   }
 }
 
-function createFirmwareSession(): FirmwareSessionInfo {
+function createFirmwareSession(mcp = false): FirmwareSessionInfo {
   return {
     sessionId: "session-1",
     protocolVersion: 2,
@@ -121,6 +126,7 @@ function createFirmwareSession(): FirmwareSessionInfo {
       type: "hello",
       version: 2,
       transport: "websocket",
+      ...(mcp ? { features: { mcp: true } } : {}),
       audio_params: {
         format: "opus",
         sample_rate: 16000,
@@ -376,6 +382,48 @@ describe("FirmwareVoiceBridge", () => {
       }
     ]);
 
+    await handler.close();
+  });
+
+  it("suppresses a provider tool result after that call is cancelled", async () => {
+    const codecFactory = new FakeCodecFactory();
+    const voiceProvider = new FakeVoiceProvider();
+    const { log, transport } = createTransport();
+    const bridge = new FirmwareVoiceBridge({
+      codecFactory,
+      voiceProvider
+    });
+    const handler = await bridge.createSession(
+      createFirmwareSession(true),
+      transport
+    );
+
+    await voiceProvider.session.emit({
+      type: "tool.call",
+      name: "device_set_volume",
+      arguments: { volume: 30 },
+      callId: "cancel-me"
+    });
+
+    expect(log.at(-1)).toMatchObject({
+      type: "json",
+      value: {
+        type: "mcp",
+        payload: {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize"
+        }
+      }
+    });
+
+    await voiceProvider.session.emit({
+      type: "tool.cancel",
+      callIds: ["cancel-me"]
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(voiceProvider.session.toolResults).toHaveLength(0);
     await handler.close();
   });
 
