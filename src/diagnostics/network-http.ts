@@ -1,19 +1,5 @@
-import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { GatewayHttpHandler } from "../gateway.js";
-
-function bearerToken(request: IncomingMessage): string | undefined {
-  const value = request.headers.authorization;
-  if (!value?.startsWith("Bearer ")) return undefined;
-  const token = value.slice(7).trim();
-  return token || undefined;
-}
-
-function secureEqual(left: string, right: string): boolean {
-  const a = Buffer.from(left);
-  const b = Buffer.from(right);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 const MAX_BYTES = 512 * 1024;
 const DEFAULT_BYTES = 128 * 1024;
@@ -62,18 +48,13 @@ export function describeNetworkId(result: NetworkDiagnosticResult): string {
 }
 
 export function createNetworkDiagnosticsHttpHandler(options: {
-  bearerToken: string;
+  authorize: (request: IncomingMessage) => boolean;
 }): GatewayHttpHandler {
-  if (options.bearerToken.trim().length < 24) {
-    throw new Error("Diagnostics bearer token must be at least 24 characters");
-  }
-
   return async (request, response) => {
     const url = new URL(request.url ?? "/", "http://nara.local");
     if (!url.pathname.startsWith("/api/diagnostics/")) return false;
 
-    const token = bearerToken(request);
-    if (!token || !secureEqual(token, options.bearerToken)) {
+    if (!options.authorize(request)) {
       response.writeHead(401, {
         "content-type": "application/json",
         "cache-control": "no-store"
