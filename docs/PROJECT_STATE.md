@@ -28,7 +28,8 @@ Server/runtime:
 - provider-neutral Action Runtime;
 - safe device actions through the firmware MCP compatibility layer;
 - normalized provider usage fields for token/cost accounting;
-- automated unit/integration coverage including a real-Opus firmware voice vertical slice.
+- automated unit/integration coverage including a real-Opus firmware voice vertical slice;
+- first file-backed personal-memory store with subject/viewer-aware recall, explicit sharing, expiry, edit/delete, bounded retrieval, and persistence tests.
 
 Firmware:
 
@@ -48,28 +49,40 @@ Do not expand into many unrelated tools before a minimal memory/context path exi
 
 ### P0 — durable project context
 
-Status: in progress in this branch.
+Status: complete in `feat/project-memory-foundation`.
 
-- keep project direction and checkpoints in the repository;
-- keep research/architecture decisions documented;
-- keep hardware purchase state documented;
-- ensure coding agents know what to read and update.
+- project checkpoint lives in the repository;
+- decisions/research/hardware state have durable docs;
+- coding agents are instructed to read/update them;
+- filled personal profiles remain outside Git.
 
 ### P1 — local personal-memory vertical slice
 
-Goal: persist and retrieve a small set of facts without sending the entire memory store to the model.
+Status: started.
 
-Required properties:
+Implemented in this branch:
 
-- subject-aware: a fact belongs to a person/entity;
-- viewer-aware: the person asking matters;
-- permission-aware: unauthorized facts are filtered before model context;
-- provenance-aware: know where a fact came from;
-- editable/deletable;
-- provider-neutral;
-- local-first and deployable without another mandatory service.
+- typed personal fact model;
+- stable subject IDs;
+- viewer-aware recall;
+- explicit per-fact `shareWith`;
+- public/private/trusted/household labels;
+- expiry;
+- relevance cap;
+- persistent local JSON file adapter under the memory boundary;
+- edit/delete by stable fact ID;
+- tests for partner, guest, restart persistence, expiry, and bounded recall.
 
-First test scenario:
+Still required before P1 is complete:
+
+- choose/wire the runtime-private storage path under `data/`;
+- validate stored records instead of trusting arbitrary file JSON;
+- expose a small service/context API rather than wiring the file adapter directly into voice;
+- add a known-person/viewer resolver;
+- prove unauthorized facts cannot reach a brain request;
+- decide migration strategy if the first file format is replaced later.
+
+First end-to-end scenario remains:
 
 > A trusted partner asks Nara a question about the owner. Nara retrieves only owner facts explicitly shareable with that partner and answers from those facts.
 
@@ -129,7 +142,7 @@ After memory/context is trustworthy:
 
 These are intentionally not treated as solved yet:
 
-- exact local memory storage engine;
+- whether the first file-backed memory adapter remains the default or is replaced by a database;
 - encryption-at-rest implementation and key ownership;
 - how a device authenticates a trusted partner versus a guest;
 - whether voice biometrics should ever be used for identity;
