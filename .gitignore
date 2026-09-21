@@ -2,5 +2,12 @@ node_modules/
 dist/
 .env
 *.log
+
+# Runtime state and personal knowledge. Never commit real personal memory.
 data/
+*.sqlite
+*.sqlite3
+config/people.local.yaml
+config/profiles/*.local.yaml
+
 .DS_Store
