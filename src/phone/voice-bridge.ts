@@ -8,13 +8,16 @@ import type {
   VoiceSessionEvent
 } from "../contracts/providers.js";
 import type {
+  PhoneSessionContext,
   PhoneSessionHandler,
   PhoneSessionTransport
 } from "../gateway.js";
 
 export type PhoneVoiceBridgeOptions = {
   voiceProvider: VoiceProvider;
-  createToolProviders?: () => ToolProvider[] | Promise<ToolProvider[]>;
+  createToolProviders?: (
+    context: PhoneSessionContext
+  ) => ToolProvider[] | Promise<ToolProvider[]>;
   onUsage?: (usage: ProviderUsage) => void | Promise<void>;
   onError?: (error: Error) => void | Promise<void>;
 };
@@ -178,10 +181,11 @@ export class PhoneVoiceBridge {
   constructor(private readonly options: PhoneVoiceBridgeOptions) {}
 
   readonly createSession = async (
-    transport: PhoneSessionTransport
+    transport: PhoneSessionTransport,
+    context: PhoneSessionContext
   ): Promise<PhoneSessionHandler> => {
     const providers = this.options.createToolProviders
-      ? await this.options.createToolProviders()
+      ? await this.options.createToolProviders(context)
       : [];
     const actions =
       providers.length > 0 ? await ActionRuntime.create(providers) : null;
