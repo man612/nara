@@ -7,6 +7,9 @@ import { DeviceRegistry } from "./device/registry.js";
 import { FirmwareVoiceBridge } from "./device/voice-bridge.js";
 import { FilePersonalMemoryStore } from "./memory/personal.js";
 import { PersonalMemoryToolProvider } from "./memory/tool-provider.js";
+import { GitHubReleaseOtaCatalog } from "./ota/catalog.js";
+import { DeviceUpdateChannels } from "./ota/channels.js";
+import { createOtaHttpHandler } from "./ota/http.js";
 import {
   createGatewayServer,
   type FirmwareSessionFactory,
@@ -141,6 +144,29 @@ async function main(): Promise<void> {
     );
   }
 
+  const otaRepository = process.env.NARA_OTA_GITHUB_REPO;
+  if (otaRepository) {
+    const otaChannels = await DeviceUpdateChannels.open({
+      filePath:
+        process.env.NARA_OTA_CHANNELS_FILE ??
+        "data/device-update-channels.json"
+    });
+    const otaCatalog = new GitHubReleaseOtaCatalog(otaRepository, {
+      ...(process.env.NARA_OTA_GITHUB_TOKEN
+        ? { githubToken: process.env.NARA_OTA_GITHUB_TOKEN }
+        : {})
+    });
+    httpHandlers.push(
+      createOtaHttpHandler({
+        catalog: otaCatalog,
+        channels: otaChannels,
+        ...(process.env.NARA_OTA_ADMIN_TOKEN
+          ? { adminToken: process.env.NARA_OTA_ADMIN_TOKEN }
+          : {})
+      })
+    );
+  }
+
   const options: GatewayOptions = {
     ...(deviceToken ? { deviceToken } : {}),
     deviceRegistry,
@@ -162,6 +188,9 @@ async function main(): Promise<void> {
       console.log(
         `Personal content:  scoped author subject=${contentSubjectId} viewers=${contentAllowedViewerIds.join(",")}`
       );
+    }
+    if (otaRepository) {
+      console.log(`OTA catalog:       GitHub releases ${otaRepository}`);
     }
 
     if (!deviceToken) {
