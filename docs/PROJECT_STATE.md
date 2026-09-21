@@ -29,6 +29,7 @@ Server/runtime:
 - safe device actions through the firmware MCP compatibility layer;
 - normalized provider usage fields for token/cost accounting;
 - automated unit/integration coverage including a real-Opus firmware voice vertical slice;
+- typed connectivity capability contract separating cloud gateway, local gateway, direct peer and isolated modes;
 - first file-backed personal-memory store with subject/viewer-aware recall, explicit sharing, expiry, edit/delete, bounded retrieval, and persistence tests.
 
 Firmware:
@@ -45,7 +46,7 @@ The transport, voice, provider, and first action vertical slices are far enough 
 
 Do not expand into many unrelated tools before a minimal memory/context path exists.
 
-Offline usefulness is now a core product requirement. The current firmware does not yet provide a real offline product mode; no-network startup still tends toward Wi-Fi configuration and cloud conversation depends on a reachable gateway. See `docs/OFFLINE_RUNTIME.md`.
+Offline usefulness is now a core product requirement. The current firmware does not yet provide a real offline product mode; no-network startup still tends toward Wi-Fi configuration and cloud conversation depends on a reachable gateway. See `docs/OFFLINE_RUNTIME.md` and `docs/PHONE_CONNECTIVITY.md`.
 
 Physical personality is also local-first. The server contract already has semantic touch/IMU event shapes, while the physical 1.85B firmware still needs a real CST816S/QMI8658 bridge and gesture classifiers. See `docs/PHYSICAL_INTERACTIONS.md`.
 
@@ -103,17 +104,25 @@ Build a context composer that selects the smallest relevant subset instead of co
 
 ### P3 — offline runtime foundation
 
-Status: designed, not implemented.
+Status: foundation started; phone/connectivity architecture and typed degradation contract are implemented, device-side offline behavior is not yet implemented.
+
+Implemented foundation:
+
+- connectivity capability vocabulary: `online`, `local_gateway`, `peer_only`, `isolated`;
+- provisioning transports are distinct from runtime links;
+- phone connection hierarchy documented: Wi-Fi station/hotspot first, on-demand SoftAP direct peer, BLE/DPP for provisioning/on-demand roles;
+- tests lock the connectivity degradation priority.
 
 Next offline milestones:
 
-- separate connectivity status from interaction state;
+- wire connectivity status independently from interaction state in firmware;
 - useful no-network startup instead of a setup dead-end;
 - local clock/timer/alarm/status/navigation;
 - local physical reflex engine for touch/IMU;
 - authorized offline personal capsule;
 - reconnect/sync behavior;
-- optional direct-phone peer mode;
+- direct-phone SoftAP + authenticated local web mode;
+- production provisioning migration/validation (DPP + secure BLE/SoftAP);
 - later local-network STT/brain/TTS.
 
 Do not promise unrestricted Indonesian STT/TTS on ESP32 alone; official ESP-SR command recognition is Chinese/English and its embedded TTS is Chinese-only.
