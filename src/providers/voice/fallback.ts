@@ -1,4 +1,5 @@
 import type {
+  VoiceConnectOptions,
   VoiceProvider,
   VoiceSession
 } from "../../contracts/providers.js";
@@ -21,13 +22,13 @@ export class FallbackVoiceProvider implements VoiceProvider {
     this.id = id;
   }
 
-  async connect(): Promise<VoiceSession> {
+  async connect(options?: VoiceConnectOptions): Promise<VoiceSession> {
     const failures: string[] = [];
 
     for (const candidate of this.candidates) {
       try {
         const provider = candidate.create();
-        return await provider.connect();
+        return await provider.connect(options);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         failures.push(`${candidate.id}: ${message}`);
