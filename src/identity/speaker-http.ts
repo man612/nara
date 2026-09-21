@@ -1,8 +1,8 @@
+import type { SpeakerProfileRef } from "./directory.js";
 import type {
   SpeakerIdentityProvider,
   SpeakerProviderResult,
-  SpeakerPcmAudio,
-  SpeakerProfileRef
+  SpeakerPcmAudio
 } from "./speaker.js";
 
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -111,7 +111,13 @@ export class HttpSpeakerIdentityProvider implements SpeakerIdentityProvider {
 
     const form = new FormData();
     const wav = wavFromPcm16(input.audio);
-    form.set("audio", new Blob([wav], { type: "audio/wav" }), "utterance.wav");
+    const wavBuffer = new ArrayBuffer(wav.byteLength);
+    new Uint8Array(wavBuffer).set(wav);
+    form.set(
+      "audio",
+      new Blob([wavBuffer], { type: "audio/wav" }),
+      "utterance.wav"
+    );
     form.set(
       "candidates",
       JSON.stringify(input.candidates.map((candidate) => ({
