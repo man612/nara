@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { z } from "zod";
 
 export type PersonalMemorySensitivity =
   | "private"
@@ -41,10 +42,30 @@ export interface PersonalMemoryStore {
   recall(query: PersonalMemoryQuery): Promise<PersonalMemoryFact[]>;
 }
 
-type PersistedMemory = {
-  version: 1;
-  facts: PersonalMemoryFact[];
-};
+export const PersonalMemoryFactSchema = z.object({
+  id: z.string().min(1),
+  subjectId: z.string().min(1),
+  kind: z.string().min(1),
+  text: z.string().min(1),
+  tags: z.array(z.string().min(1)).max(64).optional(),
+  source: z.object({
+    type: z.enum(["manual", "conversation", "import", "tool"]),
+    reference: z.string().min(1).optional()
+  }),
+  confidence: z.number().min(0).max(1).optional(),
+  sensitivity: z.enum(["private", "trusted", "household", "public"]),
+  shareWith: z.array(z.string().min(1)).max(128).optional(),
+  createdAt: z.string().datetime({ offset: true }),
+  updatedAt: z.string().datetime({ offset: true }),
+  expiresAt: z.string().datetime({ offset: true }).optional()
+});
+
+const PersistedMemorySchema = z.object({
+  version: z.literal(1),
+  facts: z.array(PersonalMemoryFactSchema)
+});
+
+type PersistedMemory = z.infer<typeof PersistedMemorySchema>;
 
 const DEFAULT_RECALL_LIMIT = 5;
 const MAX_RECALL_LIMIT = 20;
@@ -110,7 +131,8 @@ export class FilePersonalMemoryStore implements PersonalMemoryStore {
 
   async upsert(fact: PersonalMemoryFact): Promise<void> {
     await this.ensureLoaded();
-    this.facts!.set(fact.id, fact);
+    const validated = PersonalMemoryFactSchema.parse(fact);
+    this.facts!.set(validated.id, structuredClone(validated));
     await this.persist();
   }
 
@@ -141,7 +163,7 @@ export class FilePersonalMemoryStore implements PersonalMemoryStore {
         return a.fact.id.localeCompare(b.fact.id);
       })
       .slice(0, limit)
-      .map(({ fact }) => fact);
+      .map(({ fact }) => structuredClone(fact));
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -157,14 +179,21 @@ export class FilePersonalMemoryStore implements PersonalMemoryStore {
   private async load(): Promise<void> {
     try {
       const raw = await readFile(this.filePath, "utf8");
-      const parsed = JSON.parse(raw) as Partial<PersistedMemory>;
+      const parsed = PersistedMemorySchema.safeParse(JSON.parse(raw) as unknown);
 
-      if (parsed.version !== 1 || !Array.isArray(parsed.facts)) {
-        throw new Error("Unsupported personal memory file format");
+      if (!parsed.success) {
+        throw new Error(
+          `Invalid or unsupported personal memory file: ${parsed.error.issues
+            .map((issue) => issue.path.join(".") || issue.message)
+            .join(", ")}`
+        );
       }
 
       this.facts = new Map(
-        parsed.facts.map((fact) => [fact.id, fact] as const)
+        parsed.data.facts.map((fact) => [
+          fact.id,
+          structuredClone(fact)
+        ] as const)
       );
     } catch (error) {
       if (isErrnoException(error) && error.code === "ENOENT") {
