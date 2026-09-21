@@ -3,6 +3,7 @@ import type {
   AudioCodecSession
 } from "../audio/codec.js";
 import { ActionRuntime } from "../actions/runtime.js";
+import type { ToolProvider } from "../actions/contracts.js";
 import type {
   ProviderUsage,
   VoiceProvider,
@@ -33,6 +34,16 @@ export type FirmwareVoiceBridgeOptions = {
     session: FirmwareSessionInfo,
     error: Error
   ) => void | Promise<void>;
+
+  /**
+   * Additional server-side tools bound to this authenticated firmware
+   * session. Use this for viewer-scoped memory/search rather than allowing the
+   * model to choose identity parameters itself.
+   */
+  createToolProviders?: (
+    session: FirmwareSessionInfo,
+    transport: FirmwareSessionTransport
+  ) => ToolProvider[] | Promise<ToolProvider[]>;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -357,12 +368,22 @@ export class FirmwareVoiceBridge {
       }
     });
 
+    const toolProviders: ToolProvider[] = [];
     const supportsDeviceMcp = session.hello.features?.mcp === true;
-    const actions = supportsDeviceMcp
-      ? await ActionRuntime.create([
-          new DeviceMcpToolProvider(transport)
-        ])
-      : null;
+    if (supportsDeviceMcp) {
+      toolProviders.push(new DeviceMcpToolProvider(transport));
+    }
+
+    if (this.options.createToolProviders) {
+      toolProviders.push(
+        ...(await this.options.createToolProviders(session, transport))
+      );
+    }
+
+    const actions =
+      toolProviders.length > 0
+        ? await ActionRuntime.create(toolProviders)
+        : null;
 
     let voice: VoiceSession;
     try {
