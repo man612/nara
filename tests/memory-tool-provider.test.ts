@@ -75,6 +75,56 @@ describe("PersonalMemoryToolProvider", () => {
     expect(serialized).not.toContain("person:someone-else");
   });
 
+  it("resolves a changing viewer at call time instead of freezing privilege at session start", async () => {
+    const viewer = { value: "person:guest" };
+    const recalls: string[] = [];
+    const store: PersonalMemoryStore = {
+      async upsert() {},
+      async remove() {
+        return false;
+      },
+      async recall(query) {
+        recalls.push(query.viewerId);
+        return [];
+      }
+    };
+
+    const provider = new PersonalMemoryToolProvider(store, {
+      viewerId: () => viewer.value,
+      subjectId: "person:primary"
+    });
+
+    await provider.callTool(
+      {
+        name: "personal_memory_search",
+        arguments: { query: "first" }
+      },
+      new AbortController().signal
+    );
+    viewer.value = "person:partner";
+    await provider.callTool(
+      {
+        name: "personal_memory_search",
+        arguments: { query: "second" }
+      },
+      new AbortController().signal
+    );
+    viewer.value = "person:guest";
+    await provider.callTool(
+      {
+        name: "personal_memory_search",
+        arguments: { query: "third" }
+      },
+      new AbortController().signal
+    );
+
+    expect(recalls).toEqual([
+      "person:guest",
+      "person:partner",
+      "person:guest"
+    ]);
+  });
+
   it("rejects invalid or oversized queries", async () => {
     const store: PersonalMemoryStore = {
       async upsert() {},

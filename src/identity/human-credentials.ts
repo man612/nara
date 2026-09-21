@@ -195,7 +195,17 @@ export class HumanCredentialRegistry {
     if (!viewer) {
       throw new Error("Invalid or revoked human credential");
     }
+    return this.mintSessionForViewer(viewer, options);
+  }
 
+  mintSessionForViewer(
+    viewer: HumanViewerIdentity,
+    options: { ttlMs?: number } = {}
+  ): { token: string; expiresAt: string; viewer: HumanViewerIdentity } {
+    requireText(viewer.personId, "personId");
+    if (viewer.accountId !== undefined) {
+      requireText(viewer.accountId, "accountId");
+    }
     const ttlMs = options.ttlMs ?? DEFAULT_SESSION_TTL_MS;
     if (
       !Number.isFinite(ttlMs) ||

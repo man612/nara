@@ -151,6 +151,12 @@ export class DeviceRegistry {
     return this.devices.get(deviceId)?.state;
   }
 
+  listDevices(): DeviceRecord[] {
+    return [...this.devices.values()].map((record) =>
+      structuredClone(record)
+    );
+  }
+
   registerUnclaimedDevice(input: {
     deviceId: string;
     clientId?: string;

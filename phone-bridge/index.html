@@ -8,7 +8,7 @@
   <style>
     body{font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;line-height:1.45}
     main{display:grid;gap:16px}
-    input,button{font:inherit;padding:12px;border-radius:10px;border:1px solid #888}
+    input,select,button{font:inherit;padding:12px;border-radius:10px;border:1px solid #888}
     button{cursor:pointer;font-weight:600}
     .row{display:flex;gap:10px}.row>*{flex:1}
     #log{white-space:pre-wrap;min-height:96px;padding:12px;border:1px solid #888;border-radius:10px}
@@ -22,20 +22,46 @@
   <label>Phone bridge token
     <input id="token" type="password" autocomplete="off" placeholder="token transport dari server Nara">
   </label>
-  <label>Viewer credential (opsional)
-    <input id="viewerCredential" type="password" autocomplete="off" placeholder="credential manusia untuk memory trusted/private">
+  <section>
+    <h2>Identitas manusia</h2>
+    <p>Gunakan passkey HP (sidik jari/Face ID/PIN perangkat) untuk memory trusted/private. Credential manual di bawah tetap tersedia sebagai jalur bootstrap/recovery lama.</p>
+    <label>Kode enrollment passkey (hanya saat daftar pertama/recovery)
+      <input id="enrollmentToken" type="password" autocomplete="off" placeholder="kode sekali pakai dari admin Nara">
+    </label>
+    <div class="row">
+      <button id="registerPasskey" type="button">Daftar passkey</button>
+      <button id="loginPasskey" type="button">Login passkey</button>
+    </div>
+    <label>Nara fisik yang boleh dibuka sementara
+      <select id="deviceSelect" disabled>
+        <option value="">Login passkey dulu</option>
+      </select>
+    </label>
+    <div class="row">
+      <button id="grantDevice" type="button" disabled>Buka private memory 10 menit</button>
+      <button id="revokeDevice" type="button" disabled>Kunci lagi</button>
+    </div>
+  </section>
+  <label>Viewer credential lama (opsional/recovery)
+    <input id="viewerCredential" type="password" autocomplete="off" placeholder="credential manusia lama">
   </label>
   <div class="row">
-    <button id="start">Mulai</button>
+    <button id="start">Mulai audio HP/TWS</button>
     <button id="stop" disabled>Berhenti</button>
   </div>
-  <small>Mic browser membutuhkan HTTPS (atau localhost). Transport token tidak dimasukkan ke URL. Viewer credential ditukar dulu menjadi session token singkat; tanpa credential, sesi tetap guest/public.</small>
+  <small>Mic browser membutuhkan HTTPS (atau localhost). Token transport tidak dimasukkan ke URL. Passkey/session viewer berbeda dari token phone bridge dan dari credential firmware.</small>
   <div id="log">Belum terhubung.</div>
 </main>
 <script>
 (() => {
   const tokenInput = document.querySelector("#token");
   const viewerCredentialInput = document.querySelector("#viewerCredential");
+  const enrollmentTokenInput = document.querySelector("#enrollmentToken");
+  const registerPasskeyButton = document.querySelector("#registerPasskey");
+  const loginPasskeyButton = document.querySelector("#loginPasskey");
+  const deviceSelect = document.querySelector("#deviceSelect");
+  const grantDeviceButton = document.querySelector("#grantDevice");
+  const revokeDeviceButton = document.querySelector("#revokeDevice");
   const startButton = document.querySelector("#start");
   const stopButton = document.querySelector("#stop");
   const log = document.querySelector("#log");
@@ -51,6 +77,7 @@
   let captureQueue = [];
   let captureQueueSamples = 0;
   let resampleCursor = 0;
+  let viewerSessionToken;
 
   function status(text) {
     log.textContent = text + "\n" + log.textContent.split("\n").slice(0, 5).join("\n");
@@ -62,7 +89,185 @@
     for (const value of bytes) binary += String.fromCharCode(value);
     return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
+
+  function bytesToBase64url(value) {
+    const bytes = new Uint8Array(value);
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  }
+
+  function base64urlToBytes(value) {
+    const padded = value.replace(/-/g, "+").replace(/_/g, "/") +
+      "=".repeat((4 - (value.length % 4)) % 4);
+    const binary = atob(padded);
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  }
+
+  function creationOptions(options) {
+    return {
+      ...options,
+      challenge: base64urlToBytes(options.challenge),
+      user: {
+        ...options.user,
+        id: base64urlToBytes(options.user.id)
+      },
+      excludeCredentials: (options.excludeCredentials || []).map((credential) => ({
+        ...credential,
+        id: base64urlToBytes(credential.id)
+      }))
+    };
+  }
+
+  function requestOptions(options) {
+    return {
+      ...options,
+      challenge: base64urlToBytes(options.challenge),
+      allowCredentials: options.allowCredentials?.map((credential) => ({
+        ...credential,
+        id: base64urlToBytes(credential.id)
+      }))
+    };
+  }
+
+  function serializeCredential(credential) {
+    const response = credential.response;
+    const result = {
+      id: credential.id,
+      rawId: bytesToBase64url(credential.rawId),
+      type: credential.type,
+      response: {
+        clientDataJSON: bytesToBase64url(response.clientDataJSON)
+      }
+    };
+
+    if ("attestationObject" in response) {
+      result.response.attestationObject =
+        bytesToBase64url(response.attestationObject);
+      if (typeof response.getTransports === "function") {
+        result.response.transports = response.getTransports();
+      }
+    } else {
+      result.response.authenticatorData =
+        bytesToBase64url(response.authenticatorData);
+      result.response.signature =
+        bytesToBase64url(response.signature);
+      result.response.userHandle = response.userHandle
+        ? bytesToBase64url(response.userHandle)
+        : null;
+    }
+    return result;
+  }
+
+  async function jsonRequest(path, options = {}) {
+    const response = await fetch(path, {
+      cache: "no-store",
+      ...options,
+      headers: {
+        "content-type": "application/json",
+        ...(options.headers || {})
+      }
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || "request failed");
+    }
+    return payload;
+  }
+
+  async function refreshDevices() {
+    if (!viewerSessionToken) return;
+    const payload = await jsonRequest("/api/identity/devices", {
+      method: "GET",
+      headers: {
+        authorization: "Bearer " + viewerSessionToken
+      }
+    });
+    deviceSelect.innerHTML = "";
+    for (const device of payload.devices || []) {
+      const option = document.createElement("option");
+      option.value = device.deviceId;
+      option.textContent = device.deviceId;
+      deviceSelect.appendChild(option);
+    }
+    const available = deviceSelect.options.length > 0;
+    deviceSelect.disabled = !available;
+    grantDeviceButton.disabled = !available;
+    revokeDeviceButton.disabled = !available;
+    if (!available) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "Tidak ada device yang diizinkan";
+      deviceSelect.appendChild(option);
+    }
+  }
+
+  async function registerPasskey() {
+    if (!window.PublicKeyCredential) {
+      throw new Error("Browser ini belum mendukung WebAuthn/passkey.");
+    }
+    const enrollmentToken = enrollmentTokenInput.value.trim();
+    if (!enrollmentToken) {
+      throw new Error("Masukkan kode enrollment passkey.");
+    }
+    const options = await jsonRequest(
+      "/api/identity/passkeys/register/options",
+      {
+        method: "POST",
+        body: JSON.stringify({ enrollmentToken })
+      }
+    );
+    const credential = await navigator.credentials.create({
+      publicKey: creationOptions(options.publicKey)
+    });
+    if (!credential) throw new Error("Passkey registration dibatalkan.");
+    await jsonRequest("/api/identity/passkeys/register/verify", {
+      method: "POST",
+      body: JSON.stringify({
+        ceremonyId: options.ceremonyId,
+        enrollmentToken,
+        credential: serializeCredential(credential)
+      })
+    });
+    enrollmentTokenInput.value = "";
+    status("Passkey berhasil didaftarkan. Sekarang tekan Login passkey.");
+  }
+
+  async function loginPasskey() {
+    if (!window.PublicKeyCredential) {
+      throw new Error("Browser ini belum mendukung WebAuthn/passkey.");
+    }
+    const options = await jsonRequest(
+      "/api/identity/passkeys/authenticate/options",
+      { method: "POST", body: "{}" }
+    );
+    const credential = await navigator.credentials.get({
+      publicKey: requestOptions(options.publicKey)
+    });
+    if (!credential) throw new Error("Login passkey dibatalkan.");
+    const result = await jsonRequest(
+      "/api/identity/passkeys/authenticate/verify",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          ceremonyId: options.ceremonyId,
+          credential: serializeCredential(credential)
+        })
+      }
+    );
+    viewerSessionToken = result.sessionToken;
+    viewerCredentialInput.value = "";
+    status(
+      "Passkey login: " +
+        (result.viewer?.displayName || result.viewer?.personId || "known person")
+    );
+    await refreshDevices();
+  }
   async function mintViewerSession(credential) {
+    if (viewerSessionToken) return viewerSessionToken;
     if (!credential) return undefined;
     const response = await fetch("/api/identity/session", {
       method: "POST",
@@ -81,7 +286,9 @@
       "Viewer terautentikasi: " +
       (payload.viewer?.displayName || payload.viewer?.personId || "known person")
     );
-    return payload.sessionToken;
+    viewerSessionToken = payload.sessionToken;
+    await refreshDevices().catch(() => {});
+    return viewerSessionToken;
   }
 
 
@@ -218,6 +425,78 @@
     stopButton.disabled = true;
     status("Bridge berhenti.");
   }
+
+  registerPasskeyButton.addEventListener("click", async () => {
+    registerPasskeyButton.disabled = true;
+    try {
+      await registerPasskey();
+    } catch (error) {
+      status("Gagal daftar passkey: " + (error?.message ?? error));
+    } finally {
+      registerPasskeyButton.disabled = false;
+    }
+  });
+
+  loginPasskeyButton.addEventListener("click", async () => {
+    loginPasskeyButton.disabled = true;
+    try {
+      await loginPasskey();
+    } catch (error) {
+      status("Gagal login passkey: " + (error?.message ?? error));
+    } finally {
+      loginPasskeyButton.disabled = false;
+    }
+  });
+
+  grantDeviceButton.addEventListener("click", async () => {
+    if (!viewerSessionToken || !deviceSelect.value) return;
+    grantDeviceButton.disabled = true;
+    try {
+      const result = await jsonRequest(
+        "/api/identity/device-viewer-grants",
+        {
+          method: "POST",
+          headers: {
+            authorization: "Bearer " + viewerSessionToken
+          },
+          body: JSON.stringify({
+            deviceId: deviceSelect.value,
+            ttlMinutes: 10
+          })
+        }
+      );
+      status(
+        "Private memory device dibuka sampai " +
+          new Date(result.grant.expiresAt).toLocaleTimeString()
+      );
+    } catch (error) {
+      status("Gagal membuka device: " + (error?.message ?? error));
+    } finally {
+      grantDeviceButton.disabled = false;
+    }
+  });
+
+  revokeDeviceButton.addEventListener("click", async () => {
+    if (!viewerSessionToken || !deviceSelect.value) return;
+    revokeDeviceButton.disabled = true;
+    try {
+      await jsonRequest(
+        "/api/identity/device-viewer-grants?deviceId=" +
+          encodeURIComponent(deviceSelect.value),
+        {
+          method: "DELETE",
+          headers: {
+            authorization: "Bearer " + viewerSessionToken
+          }
+        }
+      );
+      status("Private memory device dikunci kembali.");
+    } catch (error) {
+      status("Gagal mengunci device: " + (error?.message ?? error));
+    } finally {
+      revokeDeviceButton.disabled = false;
+    }
+  });
 
   startButton.addEventListener("click", async () => {
     const token = tokenInput.value.trim();

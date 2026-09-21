@@ -10,6 +10,9 @@ import type { PersonDirectory } from "./identity/directory.js";
 import { loadPersonDirectoryFile } from "./identity/file-directory.js";
 import { HumanCredentialRegistry } from "./identity/human-credentials.js";
 import { createHumanAuthHttpHandler } from "./identity/human-auth-http.js";
+import { PasskeyRegistry } from "./identity/passkeys.js";
+import { createPasskeyHttpHandler } from "./identity/passkey-http.js";
+import { DeviceViewerGrantRegistry } from "./identity/device-viewer-grants.js";
 import { SpeakerIdentityService } from "./identity/speaker.js";
 import { HttpSpeakerIdentityProvider } from "./identity/speaker-http.js";
 import { SpeakerTurnRecognizer } from "./identity/speaker-turn.js";
@@ -54,7 +57,8 @@ async function createFirmwareVoiceFactory(
   voiceMemory: VoiceMemoryRuntime | undefined,
   speakerRuntime: SpeakerRuntime | undefined,
   mediaTools: MediaToolProvider | undefined,
-  companion: CompanionRuntime
+  companion: CompanionRuntime,
+  viewerGrants: DeviceViewerGrantRegistry
 ): Promise<FirmwareSessionFactory | undefined> {
   const providersFile = process.env.PROVIDERS_FILE;
   if (!providersFile) {
@@ -105,7 +109,12 @@ async function createFirmwareVoiceFactory(
             // not who is currently speaking. Realtime personal recall
             // therefore remains guest/public-scoped for now.
             new PersonalMemoryToolProvider(voiceMemory.store, {
-              viewerId: "person:guest",
+              // Device auth proves the body. A short-lived passkey-backed
+              // viewer grant can temporarily raise the viewer for private
+              // recall; expiry is resolved again on every memory call.
+              viewerId: () =>
+                viewerGrants.resolve(session.deviceId)?.personId ??
+                "person:guest",
               subjectId: voiceMemory.subjectId
             })
           ]
@@ -274,13 +283,60 @@ async function main(): Promise<void> {
       ? await HumanCredentialRegistry.open({ filePath: humanRegistryFile })
       : undefined;
 
+  const passkeyRpId = process.env.NARA_PASSKEY_RP_ID?.trim();
+  const passkeyOrigins = (
+    process.env.NARA_PASSKEY_ORIGINS ?? ""
+  )
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const passkeyConfigured =
+    passkeyRpId !== undefined ||
+    process.env.NARA_PASSKEY_ORIGINS !== undefined ||
+    process.env.NARA_PASSKEY_FILE !== undefined;
+
+  if (
+    passkeyConfigured &&
+    (!passkeyRpId ||
+      passkeyOrigins.length === 0 ||
+      !humanRegistry ||
+      !humanAdminToken ||
+      !personDirectory)
+  ) {
+    throw new Error(
+      "Passkeys require NARA_PASSKEY_RP_ID, NARA_PASSKEY_ORIGINS, " +
+        "NARA_HUMAN_AUTH_ADMIN_TOKEN, and NARA_PEOPLE_FILE"
+    );
+  }
+
+  const passkeys =
+    passkeyConfigured &&
+    passkeyRpId &&
+    passkeyOrigins.length > 0 &&
+    humanRegistry &&
+    humanAdminToken &&
+    personDirectory
+      ? await PasskeyRegistry.open({
+          filePath:
+            process.env.NARA_PASSKEY_FILE ??
+            "data/passkeys.json",
+          rpId: passkeyRpId,
+          rpName:
+            process.env.NARA_PASSKEY_RP_NAME?.trim() ||
+            "Nara",
+          origins: passkeyOrigins
+        })
+      : undefined;
+
   const companion = await CompanionRuntime.openFromEnvironment();
+  const viewerGrants = new DeviceViewerGrantRegistry();
 
   const firmwareSessionFactory = await createFirmwareVoiceFactory(
     voiceMemory,
     speakerRuntime,
     mediaTools,
-    companion
+    companion,
+    viewerGrants
   );
   const phoneToken = process.env.NARA_PHONE_BRIDGE_TOKEN;
   const phoneSessionFactory = phoneToken
@@ -386,6 +442,29 @@ async function main(): Promise<void> {
       })
     );
   }
+  if (
+    passkeys &&
+    humanRegistry &&
+    humanAdminToken &&
+    personDirectory
+  ) {
+    httpHandlers.push(
+      createPasskeyHttpHandler({
+        passkeys,
+        humanRegistry,
+        viewerGrants,
+        directory: personDirectory,
+        deviceRegistry,
+        adminToken: humanAdminToken,
+        ...(process.env.NARA_COMPANION_DEVICE_ID?.trim()
+          ? {
+              allowedDeviceId:
+                process.env.NARA_COMPANION_DEVICE_ID.trim()
+            }
+          : {})
+      })
+    );
+  }
 
   if (contentToken && contentSubjectId && personalMemoryStore) {
     const contentService = new PersonalContentService(personalMemoryStore, {
@@ -470,6 +549,11 @@ async function main(): Promise<void> {
     if (humanRegistry) {
       console.log(
         `Human viewer auth: credentials=${humanRegistryFile} short-lived phone sessions enabled`
+      );
+    }
+    if (passkeys && passkeyRpId) {
+      console.log(
+        `Passkeys:          rp=${passkeyRpId} origins=${passkeyOrigins.join(",")} physical viewer grants enabled`
       );
     }
     if (voiceMemory) {
