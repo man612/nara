@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Nara Phone Audio Bridge</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:620px;margin:0 auto;padding:24px;line-height:1.45}
+    main{display:grid;gap:16px}
+    input,button{font:inherit;padding:12px;border-radius:10px;border:1px solid #888}
+    button{cursor:pointer;font-weight:600}
+    .row{display:flex;gap:10px}.row>*{flex:1}
+    #log{white-space:pre-wrap;min-height:96px;padding:12px;border:1px solid #888;border-radius:10px}
+    small{opacity:.75}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Nara — Phone Audio Bridge</h1>
+  <p>Sambungkan TWS ke HP dan jadikan TWS sebagai input/output audio HP. Halaman ini meneruskan mic HP/TWS ke Nara dan memutar jawaban Nara lewat output audio HP/TWS.</p>
+  <label>Phone bridge token
+    <input id="token" type="password" autocomplete="off" placeholder="token dari server Nara">
+  </label>
+  <div class="row">
+    <button id="start">Mulai</button>
+    <button id="stop" disabled>Berhenti</button>
+  </div>
+  <small>Mic browser membutuhkan HTTPS (atau localhost). Token tidak dimasukkan ke URL; token dikirim sebagai WebSocket subprotocol.</small>
+  <div id="log">Belum terhubung.</div>
+</main>
+<script>
+(() => {
+  const tokenInput = document.querySelector("#token");
+  const startButton = document.querySelector("#start");
+  const stopButton = document.querySelector("#stop");
+  const log = document.querySelector("#log");
+
+  let socket;
+  let stream;
+  let audioContext;
+  let processor;
+  let silentGain;
+  let sourceNode;
+  let nextPlayTime = 0;
+  const playing = new Set();
+  let captureQueue = [];
+  let captureQueueSamples = 0;
+  let resampleCursor = 0;
+
+  function status(text) {
+    log.textContent = text + "\n" + log.textContent.split("\n").slice(0, 5).join("\n");
+  }
+
+  function base64url(text) {
+    const bytes = new TextEncoder().encode(text);
+    let binary = "";
+    for (const value of bytes) binary += String.fromCharCode(value);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+
+  function framePcm16(samples, sampleRate) {
+    const body = new Int16Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      const value = Math.max(-1, Math.min(1, samples[i]));
+      body[i] = value < 0 ? value * 32768 : value * 32767;
+    }
+    const frame = new ArrayBuffer(12 + body.byteLength);
+    const bytes = new Uint8Array(frame);
+    bytes.set([0x4e, 0x50, 0x31, 0x36], 0);
+    const view = new DataView(frame);
+    view.setUint32(4, sampleRate, true);
+    view.setUint8(8, 1);
+    bytes.set(new Uint8Array(body.buffer), 12);
+    return frame;
+  }
+
+  function resampleBlock(input, sourceRate, targetRate) {
+    if (sourceRate === targetRate) return Array.from(input);
+    const ratio = sourceRate / targetRate;
+    const output = [];
+    while (resampleCursor < input.length) {
+      const index = Math.floor(resampleCursor);
+      const next = Math.min(index + 1, input.length - 1);
+      const fraction = resampleCursor - index;
+      output.push(input[index] + (input[next] - input[index]) * fraction);
+      resampleCursor += ratio;
+    }
+    resampleCursor -= input.length;
+    return output;
+  }
+
+  function queueCapture(samples) {
+    captureQueue.push(...samples);
+    captureQueueSamples += samples.length;
+    const frameSamples = 960; // 60ms at 16kHz
+    while (captureQueueSamples >= frameSamples) {
+      const part = captureQueue.slice(0, frameSamples);
+      captureQueue = captureQueue.slice(frameSamples);
+      captureQueueSamples -= frameSamples;
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(framePcm16(part, 16000));
+      }
+    }
+  }
+
+  function clearPlayback() {
+    for (const node of playing) {
+      try { node.stop(); } catch {}
+    }
+    playing.clear();
+    nextPlayTime = audioContext ? audioContext.currentTime : 0;
+  }
+
+  function playFrame(buffer) {
+    if (!audioContext) return;
+    const bytes = new Uint8Array(buffer);
+    if (
+      bytes.length < 12 ||
+      bytes[0] !== 0x4e || bytes[1] !== 0x50 ||
+      bytes[2] !== 0x31 || bytes[3] !== 0x36
+    ) return;
+    const view = new DataView(buffer);
+    const rate = view.getUint32(4, true);
+    const channels = view.getUint8(8);
+    if (channels !== 1 || rate < 8000 || rate > 48000) return;
+
+    const pcmBytes = buffer.slice(12);
+    if (pcmBytes.byteLength % 2 !== 0) return;
+    const pcm = new Int16Array(pcmBytes);
+    const audio = audioContext.createBuffer(1, pcm.length, rate);
+    const target = audio.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) target[i] = pcm[i] / 32768;
+
+    const source = audioContext.createBufferSource();
+    source.buffer = audio;
+    source.connect(audioContext.destination);
+    const when = Math.max(audioContext.currentTime + 0.04, nextPlayTime);
+    nextPlayTime = when + audio.duration;
+    playing.add(source);
+    source.onended = () => playing.delete(source);
+    source.start(when);
+  }
+
+  async function startCapture() {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+    audioContext = new AudioContext({ latencyHint: "interactive" });
+    await audioContext.resume();
+    sourceNode = audioContext.createMediaStreamSource(stream);
+    processor = audioContext.createScriptProcessor(4096, 1, 1);
+    silentGain = audioContext.createGain();
+    silentGain.gain.value = 0;
+    processor.onaudioprocess = (event) => {
+      const input = event.inputBuffer.getChannelData(0);
+      queueCapture(resampleBlock(input, audioContext.sampleRate, 16000));
+    };
+    sourceNode.connect(processor);
+    processor.connect(silentGain);
+    silentGain.connect(audioContext.destination);
+  }
+
+  async function stopAll() {
+    try {
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "audio.end" }));
+        socket.close(1000, "user stopped");
+      }
+    } catch {}
+    socket = undefined;
+    clearPlayback();
+    try { processor?.disconnect(); } catch {}
+    try { sourceNode?.disconnect(); } catch {}
+    try { silentGain?.disconnect(); } catch {}
+    stream?.getTracks().forEach((track) => track.stop());
+    await audioContext?.close().catch(() => {});
+    stream = undefined;
+    audioContext = undefined;
+    processor = undefined;
+    sourceNode = undefined;
+    silentGain = undefined;
+    captureQueue = [];
+    captureQueueSamples = 0;
+    resampleCursor = 0;
+    startButton.disabled = false;
+    stopButton.disabled = true;
+    status("Bridge berhenti.");
+  }
+
+  startButton.addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    if (!token) {
+      status("Masukkan phone bridge token.");
+      return;
+    }
+    startButton.disabled = true;
+    try {
+      await startCapture();
+      const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(
+        scheme + "//" + location.host + "/device",
+        ["nara-phone-v1", "auth." + base64url(token)]
+      );
+      socket.binaryType = "arraybuffer";
+      socket.onopen = () => {
+        socket.send(JSON.stringify({ type: "phone.hello", version: 1 }));
+        stopButton.disabled = false;
+        status("WebSocket terhubung; menunggu voice runtime...");
+      };
+      socket.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          playFrame(event.data);
+          return;
+        }
+        const message = JSON.parse(event.data);
+        if (message.type === "phone.ready") status("Nara siap. Bicara lewat HP/TWS.");
+        if (message.type === "audio.clear") clearPlayback();
+        if (message.type === "input.transcript" && message.final) status("Kamu: " + message.text);
+        if (message.type === "output.transcript" && message.final) status("Nara: " + message.text);
+        if (message.type === "error") status("Error: " + message.message);
+      };
+      socket.onerror = () => status("WebSocket error.");
+      socket.onclose = (event) => {
+        status("Koneksi ditutup (" + event.code + ").");
+        void stopAll();
+      };
+    } catch (error) {
+      status("Gagal mulai: " + (error?.message ?? error));
+      await stopAll();
+    }
+  });
+
+  stopButton.addEventListener("click", () => void stopAll());
+})();
+</script>
+</body>
+</html>
