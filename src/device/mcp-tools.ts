@@ -7,7 +7,7 @@ import type {
 import type { FirmwareSessionTransport } from "../gateway.js";
 
 const MCP_PROTOCOL_VERSION = "2024-11-05";
-const REQUEST_TIMEOUT_MS = 5000;
+const REQUEST_TIMEOUT_MS = 15000;
 const MAX_TOOL_LIST_PAGES = 8;
 
 type PendingRequest = {
