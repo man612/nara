@@ -297,7 +297,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
 
       case "tool.call": {
         await this.options.onToolCall?.(this.session, event);
-        const task = this.executeTool(event);
+        const task = this.executeVoiceTool(event);
         this.toolTasks.add(task);
         void task.finally(() => {
           this.toolTasks.delete(task);
@@ -358,7 +358,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     }
   }
 
-  private async executeTool(
+  private async executeVoiceTool(
     event: Extract<VoiceSessionEvent, { type: "tool.call" }>
   ): Promise<void> {
     try {
