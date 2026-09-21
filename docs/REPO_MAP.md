@@ -9,6 +9,7 @@ Read this before broad code search.
 - `docs/HARDWARE_PLAN.md` — what physical hardware is targeted, what to buy, and when.
 - `docs/PERSONAL_KNOWLEDGE.md` — multi-person/private-memory architecture and access rules.
 - `docs/PERSONAL_PROFILE_TEMPLATE.md` — template for future private owner onboarding; never commit a filled real profile.
+- `docs/ONBOARDING_IDENTITY.md` — research-backed proposal for first-use gift claiming, account/device identity, secure pairing, Wi-Fi provisioning, voice identity, recovery, and transfer.
 - `docs/RESEARCH_SOURCES.md` — external projects evaluated, useful ideas, licenses, and decisions.
 
 ## Runtime entry
@@ -71,6 +72,7 @@ The current file adapter is a replaceable first implementation, not permission t
 - `docs/VOICE_RUNTIME.md` — realtime voice/runtime choices.
 - `docs/COST_EFFICIENCY.md` — token/API cost rules.
 - `docs/PERSONAL_KNOWLEDGE.md` — private personal-memory and multi-person access model.
+- `docs/ONBOARDING_IDENTITY.md` — device claim, human authentication, provisioning, speaker identity, and lifecycle design.
 
 ## Tests
 
