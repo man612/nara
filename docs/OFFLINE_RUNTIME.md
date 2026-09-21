@@ -55,6 +55,8 @@ ESP32-S3 supports Bluetooth LE but not Bluetooth Classic or LE Audio, so Bluetoo
 
 A future native phone companion may optionally act as a local compute node, but that is not required for the first offline milestone.
 
+The direct-phone implementation hierarchy, BLE lifecycle, DPP fast path, local web UI and security model are specified in `PHONE_CONNECTIVITY.md`.
+
 ### Level 3 — isolated device
 
 No Internet, no LAN gateway, no tethering, no phone connection.
@@ -409,9 +411,10 @@ No microSD required.
 
 ### O3 — direct phone peer
 
-- BLE GATT for status/control/small sync;
-- SoftAP local web interface for larger transfers;
-- optional phone compute experiment.
+- on-demand SoftAP + authenticated local web interface as the first no-app baseline;
+- BLE only for provisioning/discovery/status/control/small sync when useful;
+- keep/release BLE based on measured voice-memory/radio impact, not convenience;
+- optional phone compute experiment later.
 
 ### O4 — local network voice stack
 
