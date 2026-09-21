@@ -116,9 +116,18 @@ Buy/use the target board and validate:
 - IMU orientation;
 - sustained thermals/performance;
 - Wi-Fi reliability;
-- battery behavior if a battery is fitted.
+- battery behavior if a battery is fitted;
+- physical ES7210 mic/reference channel mapping;
+- one-mic versus two-mic AFE path;
+- input gain/clipping;
+- AEC mode/NLP tuning;
+- noise-suppression/AGC experiments;
+- voice recognition under quiet/noisy/near/far conditions;
+- audio regression after the final enclosure is fitted.
 
-See `docs/HARDWARE_PLAN.md`.
+Do not treat voice identity as a hard dependency: recognition failure must downgrade permissions/fall back to touch or phone confirmation rather than making the device unusable.
+
+See `docs/HARDWARE_PLAN.md` and `docs/AUDIO_ROBUSTNESS.md`.
 
 ### P5 — external knowledge and delegation
 
@@ -145,7 +154,8 @@ These are intentionally not treated as solved yet:
 - whether the first file-backed memory adapter remains the default or is replaced by a database;
 - encryption-at-rest implementation and key ownership;
 - how a device authenticates a trusted partner versus a guest;
-- whether voice biometrics should ever be used for identity;
+- exact server-side speaker-recognition provider/thresholds; voice match is only a confidence/personalization signal, not root authentication;
+- whether the 1.85B can and should expose both physical speech microphones plus playback reference to AFE after hardware validation;
 - import UX for large personal histories;
 - retention policy for raw transcripts;
 - how proactive speech should differ by viewer/profile.
