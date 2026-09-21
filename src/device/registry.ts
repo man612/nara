@@ -237,7 +237,7 @@ export class DeviceRegistry {
     role?: DeviceRole;
   }): Promise<void> {
     assertNonEmpty(input.accountId, "accountId");
-    const claim = this.requireLiveClaim(input.claimId);
+    const claim = await this.requireLiveClaim(input.claimId);
     if (!secureHashEqual(claim.claimTokenHash, input.claimToken)) {
       throw new Error("Invalid claim token");
     }
@@ -252,7 +252,7 @@ export class DeviceRegistry {
     claimId: string;
     deviceId: string;
   }): Promise<void> {
-    const claim = this.requireLiveClaim(input.claimId);
+    const claim = await this.requireLiveClaim(input.claimId);
     if (claim.deviceId !== input.deviceId) {
       throw new Error("Claim is bound to a different device");
     }
@@ -265,7 +265,7 @@ export class DeviceRegistry {
     claimId: string;
     deviceId: string;
   }): Promise<DeviceCredential> {
-    const claim = this.requireLiveClaim(input.claimId);
+    const claim = await this.requireLiveClaim(input.claimId);
     if (claim.deviceId !== input.deviceId) {
       throw new Error("Claim is bound to a different device");
     }
@@ -347,7 +347,7 @@ export class DeviceRegistry {
     await this.persist();
   }
 
-  private requireLiveClaim(claimId: string): ClaimRecord {
+  private async requireLiveClaim(claimId: string): Promise<ClaimRecord> {
     const claim = this.claims.get(claimId);
     if (!claim) {
       throw new Error("Unknown or already-consumed claim");
@@ -360,7 +360,7 @@ export class DeviceRegistry {
         device.state = "unclaimed";
         device.updatedAt = new Date(this.now()).toISOString();
       }
-      void this.persist();
+      await this.persist();
       throw new Error("Claim has expired");
     }
 
