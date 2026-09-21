@@ -35,6 +35,7 @@ The current file adapter is a replaceable first implementation, not permission t
 
 ## Device edge
 
+- `src/device/registry.ts` — persistent device lifecycle registry, one-time claim transactions, hashed per-device credentials, rotation/revocation and authorization helpers.
 - `src/device/firmware-wire.ts` — physical firmware hello/auth helpers and WebSocket Opus v1/v2/v3 framing.
 - `src/device/audio-pacer.ts` — bounded 60 ms playback pacing with a short prebuffer.
 - `src/device/voice-bridge.ts` — per-device firmware ↔ codec ↔ VoiceSession lifecycle bridge.
@@ -86,6 +87,8 @@ The current file adapter is a replaceable first implementation, not permission t
 ## Tests
 
 - `tests/device-contracts.test.ts`
+- `tests/device-registry.test.ts`
+- `tests/device-auth.integration.test.ts`
 - `tests/connectivity-contracts.test.ts`
 - `tests/firmware-wire.test.ts`
 - `tests/gateway-firmware.integration.test.ts`
