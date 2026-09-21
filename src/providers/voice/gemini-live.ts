@@ -245,12 +245,11 @@ class GeminiLiveVoiceSession implements VoiceSession {
       ? { result: result.value ?? null }
       : { error: result.error ?? "Tool execution failed" };
 
-    if (result.scheduling) {
-      response.scheduling =
-        result.scheduling === "when_idle"
-          ? "WHEN_IDLE"
-          : result.scheduling.toUpperCase();
-    }
+    const scheduling = result.scheduling
+      ? result.scheduling === "when_idle"
+        ? "WHEN_IDLE"
+        : result.scheduling.toUpperCase()
+      : undefined;
 
     this.sendJson({
       toolResponse: {
@@ -258,7 +257,8 @@ class GeminiLiveVoiceSession implements VoiceSession {
           {
             name: result.name,
             ...(result.callId ? { id: result.callId } : {}),
-            response
+            response,
+            ...(scheduling ? { scheduling } : {})
           }
         ]
       }
@@ -439,7 +439,7 @@ class GeminiLiveVoiceSession implements VoiceSession {
           functionDeclarations: this.tools.map((tool) => ({
             name: tool.name,
             description: tool.description,
-            parameters: tool.inputSchema,
+            parametersJsonSchema: tool.inputSchema,
             ...(tool.behavior === "non_blocking"
               ? { behavior: "NON_BLOCKING" }
               : {})
