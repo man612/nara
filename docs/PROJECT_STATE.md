@@ -33,6 +33,7 @@ Server/runtime:
 - persistent device lifecycle/claim registry with one-time device-bound claims, account + physical approval gates, hashed per-device credentials, rotation/revocation and gateway enforcement;
 - provider-neutral multi-person directory with exactly one primary person, up to six enrolled speaker profiles, and guest fallback;
 - conservative speaker-identity service contract that requires calibrated confidence + margin thresholds and never defaults an ambiguous voice to the primary person;
+- GitHub Releases-backed OTA catalog with cached manifests, per-device stable/beta channels and a firmware-compatible check endpoint;
 - first file-backed personal-memory store with subject/viewer-aware recall, explicit sharing, expiry, edit/delete, bounded retrieval, and persistence tests.
 
 Firmware:
@@ -267,3 +268,27 @@ At the end of a meaningful implementation batch:
 7. keep README status truthful.
 
 A coding agent should be able to open the repository tomorrow and reconstruct the current direction without reading the conversation that produced it.
+
+
+## OTA distribution checkpoint
+
+The server now has the distribution-side contract needed for remote firmware updates without AI usage:
+
+```text
+nara-firmware tag
+  -> GitHub release manifest/artifact
+  -> cached Nara OTA catalog
+  -> per-device stable/beta policy
+  -> /api/ota/check
+  -> ESP32 A/B updater
+```
+
+Stable is the default channel. Beta is opt-in per device through an authenticated admin endpoint. The check path uses board/version from the firmware user-agent and returns the existing firmware-compatible `firmware.version/url/force` shape plus manifest integrity metadata.
+
+Still required before production OTA is considered hardened:
+
+- merge/validate the firmware release publisher;
+- add device-credential authorization to OTA checks for claimed devices where practical;
+- verify manifest SHA-256 on-device in addition to ESP image validation;
+- provision signed-app/Secure Boot + flash-encryption policy deliberately on production hardware;
+- define staged/cohort rollout beyond stable/beta if multiple recipient devices exist.
