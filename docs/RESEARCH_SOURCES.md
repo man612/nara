@@ -270,6 +270,9 @@ Useful findings:
 - Home Assistant Voice Preview Edition's factory firmware is an especially relevant voice-device pattern: it enables BLE on Wi-Fi disconnect, disables BLE after Wi-Fi connects, and waits for BLE to be disabled before the voice-assistant client proceeds.
 - ESP-IDF's SoftAP+Station examples prove the chip can support both roles, but Nara should not keep a peer AP exposed continuously just because APSTA exists.
 
+- Nara firmware currently pins `78/esp-wifi-connect ~3.3.1`. Its upstream configuration portal presently creates an open SoftAP (`WIFI_AUTH_OPEN`) and uses plain HTTP for Wi-Fi configuration. It is therefore a development/reference provisioning surface, not a safe place for Nara private peer data.
+- ESP-IDF's own SoftAP examples support WPA2/WPA3 and Protected Management Frames, so a secure peer AP does not need to inherit the open-portal policy.
+
 Decision:
 
 Use Wi-Fi as Nara's primary runtime data plane. Phone hotspot is ordinary Wi-Fi station connectivity. The first direct-phone/no-Internet experience is an on-demand SoftAP with an authenticated local web UI, so no native app is required. BLE remains a short-lived/on-demand provisioning/control transport and should be deinitialized or dormant during normal voice operation until real 1.85B measurements justify otherwise. DPP is an optional Android-friendly fast path. Production provisioning should migrate deliberately toward Unified/Network Provisioning Security 2 instead of expanding the inherited proprietary setup path.
@@ -280,6 +283,7 @@ References:
 - https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/network/esp_dpp.html
 - https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/coexist.html
 - https://github.com/espressif/esp-idf/tree/master/examples/wifi
+- https://github.com/78/esp-wifi-connect/blob/main/wifi_configuration_ap.cc
 - https://docs.rainmaker.espressif.com/docs/dev/phone-app/home-app/home-app-device-setup/
 - https://docs.rainmaker.espressif.com/docs/dev/firmware/firmware_dev_tips/
 - https://github.com/espressif/esp-rainmaker-home
