@@ -183,6 +183,14 @@ After memory/context is trustworthy:
 - optional identity/pairing methods;
 - multiple devices/profiles without cloning the core runtime.
 
+## Known connectivity security blocker
+
+The inherited hotspot provisioning path from `78/esp-wifi-connect ~3.3.1` currently uses an open SoftAP and HTTP configuration portal. It is acceptable only as a development/reference path.
+
+Before direct-phone peer mode can expose any private capsule/media/account data, Nara needs a separate authenticated peer surface with protected Wi-Fi and application/session authorization. Production Wi-Fi credential provisioning should migrate toward DPP or ESP-IDF Unified/Network Provisioning Security 2.
+
+See `docs/PHONE_CONNECTIVITY.md`.
+
 ## Open decisions
 
 These are intentionally not treated as solved yet:
