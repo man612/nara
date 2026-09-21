@@ -15,6 +15,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 COPY --from=build /app/dist ./dist
 COPY virtual-device ./virtual-device
+COPY phone-bridge ./phone-bridge
 COPY config ./config
 EXPOSE 8787
 CMD ["pnpm", "start"]

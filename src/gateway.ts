@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import type {
   IncomingMessage,
@@ -9,7 +9,12 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import WebSocket, { WebSocketServer } from "ws";
 import type { RawData } from "ws";
+import type { AudioChunk } from "./contracts/providers.js";
 import type { DeviceCommand, DeviceEvent } from "./contracts/device.js";
+import {
+  decodePhonePcmFrame,
+  encodePhonePcmFrame
+} from "./phone/protocol.js";
 import {
   bearerTokenFromAuthorization,
   type DeviceRegistry
@@ -52,6 +57,22 @@ export type FirmwareSessionFactory = (
   transport: FirmwareSessionTransport
 ) => Promise<FirmwareSessionHandler>;
 
+export type PhoneSessionTransport = {
+  sendJson(message: unknown): void;
+  sendAudio(chunk: AudioChunk): void;
+  close(code?: number, reason?: string): void;
+};
+
+export interface PhoneSessionHandler {
+  onAudio(chunk: AudioChunk): void | Promise<void>;
+  onEvent(event: unknown): void | Promise<void>;
+  close(): void | Promise<void>;
+}
+
+export type PhoneSessionFactory = (
+  transport: PhoneSessionTransport
+) => Promise<PhoneSessionHandler>;
+
 export type GatewayHooks = {
   onFirmwareAudio?: (
     session: FirmwareSessionInfo,
@@ -76,6 +97,9 @@ export type GatewayOptions = {
   deviceRegistry?: DeviceRegistry;
   virtualDeviceHtml?: string;
   firmwareSessionFactory?: FirmwareSessionFactory;
+  phoneSessionFactory?: PhoneSessionFactory;
+  phoneToken?: string;
+  phoneBridgeHtml?: string;
   httpHandlers?: GatewayHttpHandler[];
   hooks?: GatewayHooks;
 };
@@ -111,6 +135,33 @@ function headerString(
   return value;
 }
 
+function secureEqualText(left: string, right: string): boolean {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  return a.byteLength === b.byteLength && timingSafeEqual(a, b);
+}
+
+function expectedPhoneProtocol(token: string): string {
+  return `auth.${Buffer.from(token, "utf8").toString("base64url")}`;
+}
+
+export function isGatewayPhoneAuthorized(
+  request: IncomingMessage,
+  phoneToken?: string
+): boolean {
+  if (!phoneToken) return false;
+  const header = headerString(request.headers["sec-websocket-protocol"]);
+  if (!header) return false;
+  const protocols = header
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return (
+    protocols.includes("nara-phone-v1") &&
+    protocols.some((value) => secureEqualText(value, expectedPhoneProtocol(phoneToken)))
+  );
+}
+
 export function isGatewayDeviceAuthorized(
   request: IncomingMessage,
   options: Pick<GatewayOptions, "deviceToken" | "deviceRegistry">
@@ -144,11 +195,31 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
   const virtualDeviceHtml =
     options.virtualDeviceHtml ??
     resolve(process.cwd(), "virtual-device", "index.html");
+  const phoneBridgeHtml =
+    options.phoneBridgeHtml ??
+    resolve(process.cwd(), "phone-bridge", "index.html");
 
   const server = createServer(async (req, res) => {
     if (req.url === "/" || req.url === "/virtual-device") {
       const html = await readFile(virtualDeviceHtml, "utf8");
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(html);
+      return;
+    }
+
+    if (req.url === "/phone") {
+      if (!options.phoneToken || !options.phoneSessionFactory) {
+        res.writeHead(404);
+        res.end("phone bridge is not configured");
+        return;
+      }
+      const html = await readFile(phoneBridgeHtml, "utf8");
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "content-security-policy":
+          "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' ws: wss:; media-src 'self' blob:"
+      });
       res.end(html);
       return;
     }
@@ -184,14 +255,19 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
     server,
     path: "/device",
     verifyClient: (info: { req: IncomingMessage }) =>
-      isGatewayDeviceAuthorized(info.req, options)
+      isGatewayDeviceAuthorized(info.req, options) ||
+      isGatewayPhoneAuthorized(info.req, options.phoneToken)
   });
 
   wss.on("connection", (socket, request) => {
     const sessionId = randomUUID();
     const deviceId = headerString(request.headers["device-id"]);
     const clientId = headerString(request.headers["client-id"]);
+    const deviceAuthorized = isGatewayDeviceAuthorized(request, options);
+    const phoneAuthorized = isGatewayPhoneAuthorized(request, options.phoneToken);
     let firmwareSession: FirmwareSessionInfo | null = null;
+    let phoneSession = false;
+    let phoneHandler: PhoneSessionHandler | null = null;
     let firmwareHandler: FirmwareSessionHandler | null = null;
     let firmwareTransport: FirmwareSessionTransport | null = null;
     let semanticClient = false;
@@ -242,14 +318,46 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
       };
     };
 
+    const createPhoneTransport = (): PhoneSessionTransport => {
+      const requireOpen = () => {
+        if (socket.readyState !== WebSocket.OPEN) {
+          throw new Error("Phone WebSocket is not open");
+        }
+      };
+
+      return {
+        sendJson(message: unknown) {
+          requireOpen();
+          socket.send(JSON.stringify(message));
+        },
+        sendAudio(chunk: AudioChunk) {
+          requireOpen();
+          socket.send(Buffer.from(encodePhonePcmFrame(chunk)), { binary: true });
+        },
+        close(code = 1000, reason = "phone session closed") {
+          if (
+            socket.readyState === WebSocket.OPEN ||
+            socket.readyState === WebSocket.CONNECTING
+          ) {
+            socket.close(code, reason.slice(0, 120));
+          }
+        }
+      };
+    };
+
     const handleMessage = async (raw: RawData, isBinary: boolean) => {
       if (isBinary) {
-        if (firmwareSession === null) {
-          socket.close(1002, "firmware hello required before binary audio");
-          return;
-        }
-
         try {
+          if (phoneSession) {
+            const chunk = decodePhonePcmFrame(toBytes(raw));
+            await phoneHandler?.onAudio(chunk);
+            return;
+          }
+          if (firmwareSession === null) {
+            socket.close(1002, "hello required before binary audio");
+            return;
+          }
+
           const frame = decodeFirmwareAudioFrame(
             toBytes(raw),
             firmwareSession.protocolVersion
@@ -258,7 +366,7 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
           await options.hooks?.onFirmwareAudio?.(firmwareSession, frame);
         } catch (error) {
           const message =
-            error instanceof Error ? error.message : "invalid firmware audio frame";
+            error instanceof Error ? error.message : "invalid audio frame";
           socket.close(1002, message.slice(0, 120));
         }
         return;
@@ -272,8 +380,43 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
         return;
       }
 
+      if (
+        isRecord(message) &&
+        message.type === "phone.hello" &&
+        message.version === 1
+      ) {
+        if (!phoneAuthorized || firmwareSession !== null || semanticClient || phoneSession) {
+          socket.close(1008, "phone bridge authorization required");
+          return;
+        }
+        if (!options.phoneSessionFactory) {
+          socket.close(1011, "phone bridge is not configured");
+          return;
+        }
+
+        phoneSession = true;
+        const transport = createPhoneTransport();
+        try {
+          phoneHandler = await options.phoneSessionFactory(transport);
+          socket.send(JSON.stringify({
+            type: "phone.ready",
+            version: 1,
+            input: { format: "pcm16le", sample_rate: 16000, channels: 1 }
+          }));
+          console.log(`[phone:${sessionId}] connected`);
+        } catch (error) {
+          console.error(`[phone:${sessionId}] setup failed`, error);
+          socket.close(1011, "phone voice session setup failed");
+        }
+        return;
+      }
+
       if (isFirmwareHello(message)) {
-        if (semanticClient || firmwareSession !== null) {
+        if (!deviceAuthorized) {
+          socket.close(1008, "device authorization required");
+          return;
+        }
+        if (semanticClient || firmwareSession !== null || phoneSession) {
           socket.close(1002, "duplicate or conflicting hello");
           return;
         }
@@ -315,7 +458,11 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
       }
 
       if (isSemanticHello(message)) {
-        if (firmwareSession !== null || semanticClient) {
+        if (!deviceAuthorized) {
+          socket.close(1008, "device authorization required");
+          return;
+        }
+        if (firmwareSession !== null || semanticClient || phoneSession) {
           socket.close(1002, "duplicate or conflicting hello");
           return;
         }
@@ -329,6 +476,11 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
           intensity: 0.6,
           durationMs: 1200
         });
+        return;
+      }
+
+      if (phoneSession) {
+        await phoneHandler?.onEvent(message);
         return;
       }
 
@@ -385,6 +537,7 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
         try {
           await messageChain.catch(() => undefined);
           await firmwareHandler?.close();
+          await phoneHandler?.close();
           if (firmwareSession) {
             await options.hooks?.onFirmwareClosed?.(firmwareSession);
           }
@@ -393,6 +546,7 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
         } finally {
           firmwareHandler = null;
           firmwareTransport = null;
+          phoneHandler = null;
         }
       })();
     });
