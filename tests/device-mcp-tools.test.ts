@@ -64,7 +64,7 @@ describe("DeviceMcpToolProvider", () => {
       new AbortController().signal
     );
 
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(payloadAt(sent, 0)).toMatchObject({
       jsonrpc: "2.0",
       id: 1,
@@ -84,7 +84,7 @@ describe("DeviceMcpToolProvider", () => {
       }
     });
 
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(payloadAt(sent, 1)).toEqual({
       jsonrpc: "2.0",
       method: "notifications/initialized"
@@ -117,7 +117,7 @@ describe("DeviceMcpToolProvider", () => {
       }
     });
 
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(payloadAt(sent, 3)).toEqual({
       jsonrpc: "2.0",
       id: 3,
