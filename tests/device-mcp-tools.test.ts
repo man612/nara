@@ -97,11 +97,10 @@ describe("DeviceMcpToolProvider", () => {
   });
 
 
-  it("accepts touch reflex and offline utility arguments before device discovery", async () => {
+  it("forwards touch reflex arguments after MCP discovery", async () => {
     const { sent, transport } = createTransport();
     const provider = new DeviceMcpToolProvider(transport);
-
-    const reflex = provider.callTool(
+    const pending = provider.callTool(
       {
         name: "device_set_reflex",
         arguments: {
@@ -115,34 +114,150 @@ describe("DeviceMcpToolProvider", () => {
     );
 
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(payloadAt(sent, 0)).toMatchObject({
-      method: "initialize"
-    });
-    await provider.close();
-    await expect(reflex).resolves.toMatchObject({
-      ok: false
+    provider.onEvent({
+      type: "mcp",
+      payload: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          protocolVersion: "2024-11-05",
+          capabilities: { tools: {} },
+          serverInfo: { name: "waveshare", version: "test" }
+        }
+      }
     });
 
-    const second = createTransport();
-    const offline = new DeviceMcpToolProvider(second.transport);
-    const call = offline.callTool(
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    provider.onEvent({
+      type: "mcp",
+      payload: {
+        jsonrpc: "2.0",
+        id: 2,
+        result: {
+          tools: [
+            {
+              name: "self.reflex.configure",
+              description: "reflex",
+              inputSchema: { type: "object" }
+            }
+          ]
+        }
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(payloadAt(sent, 3)).toEqual({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: {
+        name: "self.reflex.configure",
+        arguments: {
+          gesture: "pet",
+          emotion: "happy",
+          sound: "asset:meow.ogg"
+        }
+      }
+    });
+
+    provider.onEvent({
+      type: "mcp",
+      payload: {
+        jsonrpc: "2.0",
+        id: 3,
+        result: {
+          content: [{ type: "text", text: "true" }],
+          isError: false
+        }
+      }
+    });
+
+    await expect(pending).resolves.toMatchObject({
+      name: "device_set_reflex",
+      callId: "pet-1",
+      ok: true,
+      value: true
+    });
+  });
+
+  it("forwards validated offline timer arguments after MCP discovery", async () => {
+    const { sent, transport } = createTransport();
+    const provider = new DeviceMcpToolProvider(transport);
+    const pending = provider.callTool(
       {
         name: "device_offline_utility",
         arguments: {
-          action: "timezone",
-          timezone_offset_minutes: 420
+          action: "timer",
+          seconds: 300
         },
-        callId: "tz-1"
+        callId: "timer-1"
       },
       new AbortController().signal
     );
+
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(payloadAt(second.sent, 0)).toMatchObject({
-      method: "initialize"
+    provider.onEvent({
+      type: "mcp",
+      payload: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          protocolVersion: "2024-11-05",
+          capabilities: { tools: {} },
+          serverInfo: { name: "waveshare", version: "test" }
+        }
+      }
     });
-    await offline.close();
-    await expect(call).resolves.toMatchObject({
-      ok: false
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    provider.onEvent({
+      type: "mcp",
+      payload: {
+        jsonrpc: "2.0",
+        id: 2,
+        result: {
+          tools: [
+            {
+              name: "self.offline.utility",
+              description: "offline",
+              inputSchema: { type: "object" }
+            }
+          ]
+        }
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(payloadAt(sent, 3)).toEqual({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: {
+        name: "self.offline.utility",
+        arguments: {
+          action: "timer",
+          seconds: 300
+        }
+      }
+    });
+
+    provider.onEvent({
+      type: "mcp",
+      payload: {
+        jsonrpc: "2.0",
+        id: 3,
+        result: {
+          content: [{ type: "text", text: "timer set" }],
+          isError: false
+        }
+      }
+    });
+
+    await expect(pending).resolves.toMatchObject({
+      name: "device_offline_utility",
+      callId: "timer-1",
+      ok: true,
+      value: "timer set"
     });
   });
 
