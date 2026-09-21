@@ -17,10 +17,12 @@ import { MediaToolProvider } from "./media/tool-provider.js";
 import { GitHubReleaseOtaCatalog } from "./ota/catalog.js";
 import { DeviceUpdateChannels } from "./ota/channels.js";
 import { createOtaHttpHandler } from "./ota/http.js";
+import { PhoneVoiceBridge } from "./phone/voice-bridge.js";
 import {
   createGatewayServer,
   isGatewayDeviceAuthorized,
   type FirmwareSessionFactory,
+  type PhoneSessionFactory,
   type GatewayOptions
 } from "./gateway.js";
 import { createVoiceChain } from "./provider-registry.js";
@@ -113,6 +115,44 @@ async function createFirmwareVoiceFactory(
   return bridge.createSession;
 }
 
+async function createPhoneVoiceFactory(
+  voiceMemory?: VoiceMemoryRuntime,
+  mediaTools?: MediaToolProvider
+): Promise<PhoneSessionFactory | undefined> {
+  const providersFile = process.env.PROVIDERS_FILE;
+  if (!providersFile) return undefined;
+
+  const providersConfig = await loadProvidersConfig(providersFile);
+  const voiceProvider = createVoiceChain(providersConfig);
+  const bridge = new PhoneVoiceBridge({
+    voiceProvider,
+    ...(voiceMemory || mediaTools
+      ? {
+          createToolProviders: () => [
+            ...(voiceMemory
+              ? [
+                  // A phone bridge bearer token authorizes the transport, but
+                  // is not a human account/passkey. Keep personal recall at
+                  // guest/public scope until strong viewer auth is bound.
+                  new PersonalMemoryToolProvider(voiceMemory.store, {
+                    viewerId: "person:guest",
+                    subjectId: voiceMemory.subjectId
+                  })
+                ]
+              : []),
+            ...(mediaTools ? [mediaTools] : [])
+          ]
+        }
+      : {}),
+    onUsage: (usage) => {
+      console.log(
+        `[phone] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`
+      );
+    }
+  });
+  return bridge.createSession;
+}
+
 async function main(): Promise<void> {
   const port = Number(process.env.PORT ?? 8787);
   const deviceToken = process.env.NARA_DEVICE_TOKEN;
@@ -201,6 +241,10 @@ async function main(): Promise<void> {
     speakerRuntime,
     mediaTools
   );
+  const phoneToken = process.env.NARA_PHONE_BRIDGE_TOKEN;
+  const phoneSessionFactory = phoneToken
+    ? await createPhoneVoiceFactory(voiceMemory, mediaTools)
+    : undefined;
 
   const contentToken = process.env.NARA_CONTENT_ADMIN_TOKEN;
   const contentSubjectId = process.env.NARA_CONTENT_AUTHOR_SUBJECT_ID;
@@ -287,6 +331,9 @@ async function main(): Promise<void> {
     ...(deviceToken ? { deviceToken } : {}),
     deviceRegistry,
     ...(firmwareSessionFactory ? { firmwareSessionFactory } : {}),
+    ...(phoneToken && phoneSessionFactory
+      ? { phoneToken, phoneSessionFactory }
+      : {}),
     ...(httpHandlers.length > 0 ? { httpHandlers } : {})
   };
   const { server } = createGatewayServer(options);
@@ -295,6 +342,9 @@ async function main(): Promise<void> {
     console.log(`Companion gateway: http://localhost:${port}`);
     console.log(`Virtual device:   http://localhost:${port}/virtual-device`);
     console.log(`Device registry:  ${deviceRegistryFile}`);
+    if (phoneToken && phoneSessionFactory) {
+      console.log(`Phone audio:      http://localhost:${port}/phone`);
+    }
     if (voiceMemory) {
       console.log(
         `Voice memory:      guest/public scope subject=${voiceMemory.subjectId} file=${personalMemoryFile}`
