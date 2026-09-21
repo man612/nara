@@ -164,7 +164,7 @@ export class FilePersonalMemoryStore implements PersonalMemoryStore {
       }
 
       this.facts = new Map(
-        parsed.facts.map((fact) => [fact.id, fact])
+        parsed.facts.map((fact) => [fact.id, fact] as const)
       );
     } catch (error) {
       if (isErrnoException(error) && error.code === "ENOENT") {
