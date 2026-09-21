@@ -312,7 +312,7 @@ export class TelegramBridge {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
-        signal
+        ...(signal ? { signal } : {})
       }
     );
     if (!response.ok) {
