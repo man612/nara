@@ -119,8 +119,8 @@ async function createFirmwareVoiceFactory(
     onControlClosed: (session) => {
       companion.unregisterVoiceControl(session);
     },
-    onOutputTranscript: (_session, text, final) =>
-      companion.handleOutputTranscript(text, final),
+    onOutputTranscript: (session, text, final) =>
+      companion.handleOutputTranscript(session, text, final),
     onLatencySample: (sample) => {
       companion.recordLatency(sample);
     }
@@ -274,7 +274,7 @@ async function main(): Promise<void> {
       ? await HumanCredentialRegistry.open({ filePath: humanRegistryFile })
       : undefined;
 
-  const companion = CompanionRuntime.fromEnvironment();
+  const companion = await CompanionRuntime.openFromEnvironment();
 
   const firmwareSessionFactory = await createFirmwareVoiceFactory(
     voiceMemory,
@@ -348,6 +348,14 @@ async function main(): Promise<void> {
   const httpHandlers: NonNullable<GatewayOptions["httpHandlers"]> = [];
   httpHandlers.push(
     companion.networkDiagnosticsHandler((request) =>
+      isGatewayDeviceAuthorized(request, {
+        ...(deviceToken ? { deviceToken } : {}),
+        deviceRegistry
+      })
+    )
+  );
+  httpHandlers.push(
+    companion.remoteInboxHandler((request) =>
       isGatewayDeviceAuthorized(request, {
         ...(deviceToken ? { deviceToken } : {}),
         deviceRegistry
