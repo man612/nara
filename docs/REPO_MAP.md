@@ -13,6 +13,7 @@ Read this before broad code search.
 - `docs/AUDIO_ROBUSTNESS.md` — hardware/audio audit, fail-soft voice identity, fallback UX, diagnostics, and hardware-in-the-loop test plan.
 - `docs/OFFLINE_RUNTIME.md` — offline capability levels, isolated-device utilities, local personal capsule, local-network voice, reconnect, and security strategy.
 - `docs/PHYSICAL_INTERACTIONS.md` — CST816S/QMI8658 capabilities, local reflex architecture, gesture classifiers, reaction policy, and hardware validation.
+- `docs/PHONE_CONNECTIVITY.md` — phone hotspot, direct SoftAP peer mode, BLE/DPP provisioning roles, capability states, security, and implementation order.
 - `docs/RESEARCH_SOURCES.md` — external projects evaluated, useful ideas, licenses, and decisions.
 
 ## Runtime entry
@@ -20,6 +21,7 @@ Read this before broad code search.
 - `src/index.ts` — process/bootstrap entry only. Keep it thin.
 - `src/gateway.ts` — HTTP/WebSocket server, firmware/semantic session handshake and device-edge hooks.
 - `src/contracts/device.ts` — hardware-neutral semantic device messages.
+- `src/contracts/connectivity.ts` — cloud/local-gateway/direct-peer/isolated capability model and provisioning/runtime transport vocabulary.
 - `src/contracts/providers.ts` — voice/brain/search/memory contracts and normalized usage.
 - `src/provider-registry.ts` — provider construction and fallback composition.
 
@@ -79,10 +81,12 @@ The current file adapter is a replaceable first implementation, not permission t
 - `docs/AUDIO_ROBUSTNESS.md` — mic/speaker/AEC robustness, voice identity fallback, diagnostics, and HIL audio validation.
 - `docs/OFFLINE_RUNTIME.md` — offline-first behavior, local capsule, peer mode, local voice provider path, and reconnect rules.
 - `docs/PHYSICAL_INTERACTIONS.md` — touch/motion reflexes, petting/shake/upside-down behavior, classifier boundaries, and local personality rules.
+- `docs/PHONE_CONNECTIVITY.md` — phone commissioning, tethering, direct local access, BLE lifecycle, DPP and local-web strategy.
 
 ## Tests
 
 - `tests/device-contracts.test.ts`
+- `tests/connectivity-contracts.test.ts`
 - `tests/firmware-wire.test.ts`
 - `tests/gateway-firmware.integration.test.ts`
 - `tests/audio-codec.test.ts`
