@@ -100,7 +100,7 @@ export class OpenMeteoWeatherClient {
     );
     url.searchParams.set("forecast_days", "1");
 
-    const response = await this.fetchImpl(url, { signal });
+    const response = await this.fetchImpl(url, { ...(signal ? { signal } : {}) });
     if (!response.ok) {
       throw new Error("Weather request failed: HTTP " + response.status);
     }
