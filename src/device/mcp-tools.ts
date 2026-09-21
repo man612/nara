@@ -75,6 +75,89 @@ const deviceToolSpecs: DeviceToolSpec[] = [
       }
       return { volume };
     }
+  },
+  {
+    name: "device_set_reflex",
+    mcpName: "self.reflex.configure",
+    description:
+      "Change a local flip, shake, or spin reaction only when the user explicitly asks to customize it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        gesture: {
+          type: "string",
+          enum: ["flip", "shake", "spin"]
+        },
+        enabled: { type: "boolean" },
+        emotion: {
+          type: "string",
+          enum: ["neutral", "happy", "shy", "sad", "annoyed", "surprised"]
+        },
+        sound: {
+          type: "string",
+          maxLength: 110,
+          description:
+            "none, builtin:popup, builtin:exclamation, or asset:<local Ogg asset name>"
+        },
+        preview: { type: "boolean" }
+      },
+      required: ["gesture"],
+      additionalProperties: false
+    },
+    effect: "write",
+    validate(argumentsValue) {
+      if (!isRecord(argumentsValue)) {
+        throw new Error("device_set_reflex requires an object");
+      }
+      const gesture = argumentsValue.gesture;
+      if (
+        typeof gesture !== "string" ||
+        !["flip", "shake", "spin"].includes(gesture)
+      ) {
+        throw new Error("gesture must be flip, shake, or spin");
+      }
+
+      const result: Record<string, unknown> = { gesture };
+      if (argumentsValue.enabled !== undefined) {
+        if (typeof argumentsValue.enabled !== "boolean") {
+          throw new Error("enabled must be boolean");
+        }
+        result.enabled = argumentsValue.enabled;
+      }
+      if (argumentsValue.emotion !== undefined) {
+        if (
+          typeof argumentsValue.emotion !== "string" ||
+          ![
+            "neutral",
+            "happy",
+            "shy",
+            "sad",
+            "annoyed",
+            "surprised"
+          ].includes(argumentsValue.emotion)
+        ) {
+          throw new Error("invalid reflex emotion");
+        }
+        result.emotion = argumentsValue.emotion;
+      }
+      if (argumentsValue.sound !== undefined) {
+        if (
+          typeof argumentsValue.sound !== "string" ||
+          argumentsValue.sound.length === 0 ||
+          argumentsValue.sound.length > 110
+        ) {
+          throw new Error("sound must be a non-empty string up to 110 characters");
+        }
+        result.sound = argumentsValue.sound;
+      }
+      if (argumentsValue.preview !== undefined) {
+        if (typeof argumentsValue.preview !== "boolean") {
+          throw new Error("preview must be boolean");
+        }
+        result.preview = argumentsValue.preview;
+      }
+      return result;
+    }
   }
 ];
 
