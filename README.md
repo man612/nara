@@ -57,10 +57,18 @@ Nara does not assume a permanent host. It can run on a laptop, home server, gene
 
 ## Status
 
-The physical realtime voice path is wired end-to-end at the gateway layer: firmware Opus framing, session-scoped Opus/PCM transcoding, a resumable Gemini Live adapter, bounded device playback pacing, interruption handling, provider-neutral session lifecycle, and connect-time voice-provider fallback routing are implemented and covered by automated tests including a real-Opus WebSocket vertical slice.
+Nara's software core is now a real end-to-end system rather than an architecture sketch.
 
-Nara also has a provider-neutral Action Runtime. Gemini Live can receive compact Nara tool declarations, emit tool calls, execute safe physical actions through the firmware's legacy MCP server, receive results, and cancel active calls by ID. The first device aliases cover status and speaker volume, with an end-to-end fake-ESP32 WebSocket integration test.
+The physical realtime voice path supports firmware WebSocket/Opus framing, session-scoped Opus/PCM transcoding, Gemini Live, provider-neutral voice-session contracts, connect-time fallback, bounded playback pacing, interruption/barge-in lifecycle, tool calls and usage/token accounting. Automated coverage includes a real-Opus firmware-to-provider round trip.
 
-The standalone firmware also has the portable Nara face engine integrated into the Waveshare runtime.
+The Action Runtime can execute compact, validated tools without exposing firmware-specific MCP details to the model. Implemented capabilities include device status/volume, physical-reflex customization, privacy-filtered personal-memory retrieval and Spotify playback/search/control. Server-side tools continue to work even when a firmware MCP tool is not involved.
 
-The next architectural milestones are the local personal-memory/context vertical slice and an offline runtime foundation where loss of Internet degrades capabilities instead of making the companion useless. Hardware-in-the-loop voice/action validation, search, optional Hermes delegation, additional production voice adapters, and later in-session provider recovery follow.
+Identity and memory have fail-closed boundaries. Devices have a persistent claim/credential lifecycle with rotation and revocation. Personal facts are subject/viewer-aware, validated before persistence and filtered before model context. Realtime voice deliberately remains guest/public-scoped until a strong authenticated human viewer is bound to the session; speaker recognition is personalization evidence, not root authorization.
+
+The standalone Waveshare 1.85B firmware builds in CI and includes Nara's parametric face, local audio-driven mouth motion, touch/IMU physical reflexes, flip/shake/spin classifiers, persistent custom reaction packs, private local reaction-sound assets, battery-gauge policy, Wi-Fi saved-network recovery, useful no-network idle behavior and an authenticated OTA path. Custom reaction sounds can be updated through the separate asset partition rather than rebuilding gesture behavior.
+
+A separate authenticated browser phone-audio bridge is also implemented. A phone can provide microphone/audio output to the same provider-neutral voice runtime; when a TWS headset is routed through the phone OS, the browser path can use that phone/TWS audio route. The phone credential is isolated from firmware credentials and does not automatically grant private-memory access.
+
+Optional external local vision for the Waveshare target is implemented and merged in Nara Firmware. It uses a small ESP-IDF-native SSCMA I2C adapter so a compatible external vision module can return compact local detection boxes; only normalized gaze coordinates drive Nara's eyes, without streaming ordinary tracking frames to the LLM.
+
+What remains cannot be truthfully marked complete from CI alone: physical microphone/AEC/speaker tuning, real gesture threshold calibration in the final enclosure, battery-life measurements, phone/TWS browser validation on target devices, and external-camera field-of-view/orientation calibration. Product-layer work that is still intentionally staged includes strong human/passkey authentication for private-memory privilege, richer isolated-device utilities/capsule UX, production commissioning migration and optional additional voice/search/delegation providers.

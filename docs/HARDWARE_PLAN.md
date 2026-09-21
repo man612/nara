@@ -4,6 +4,15 @@ This document keeps the physical purchase/test plan in the repository so it does
 
 Last reviewed: 2026-09-21
 
+
+## Current software/hardware boundary
+
+The target firmware now compiles with the local face, physical motion reflexes, custom reaction assets, battery policy and hardened OTA path. That does **not** replace target-board validation.
+
+If local person/object-following gaze is desired, add an external SSCMA-compatible vision module. The researched first route is a Grove Vision AI Module V2-class device over the board's exposed I2C expansion; the base Waveshare 1.85B itself has no camera. Treat the exact module, power wiring, model, field of view and mounting orientation as hardware choices to verify before assembly.
+
+For phone/TWS voice, no Bluetooth-audio add-on is required on the ESP32. The implemented route is TWS -> phone OS/browser -> Nara Gateway. It still needs testing on the actual phone/browser/TWS combination.
+
 ## First target
 
 **Waveshare ESP32-S3-Touch-LCD-1.85B**

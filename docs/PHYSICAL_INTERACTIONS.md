@@ -4,6 +4,22 @@ Status: accepted product direction; hardware thresholds remain uncalibrated unti
 
 Last reviewed: 2026-09-21
 
+
+## Implementation checkpoint
+
+The first physical-reflex software slice is now implemented on the Waveshare target:
+
+- QMI8658 sampling is wired into firmware;
+- deterministic flip/shake/spin classification exists;
+- reactions run locally while idle;
+- reaction emotion and sound are persistent per gesture;
+- built-in sounds work as fallback;
+- custom Ogg reactions can be loaded from the asset partition;
+- asset updates are separate from gesture behavior and the remote installer is user/admin-only;
+- raw high-rate motion data is not streamed to the LLM.
+
+The remaining gesture work is primarily hardware/calibration driven: touch orientation, pet/stroke tuning, face-down/upside-down thresholds, mild-versus-strong shake, knock false positives, pickup/set-down inference and final-enclosure validation.
+
 ## Product goal
 
 Nara should feel physically present even when the network is unavailable.

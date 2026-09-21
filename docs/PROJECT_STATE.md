@@ -2,293 +2,303 @@
 
 This file is Nara's durable project checkpoint for humans and coding agents.
 
-Read it after `docs/REPO_MAP.md`. Update it after any meaningful implementation batch that changes what is finished, what is next, or what is blocked. Do not rely on a chat transcript as the only record of project direction.
+Read it after `docs/REPO_MAP.md`. Update it after every meaningful implementation batch. Do not rely on chat history as the only source of truth.
 
-Last reviewed: 2026-09-21  
-Baseline before this document: `e02be087ce6873406ff32a9e5461b7cb2d336a69`
+Last reviewed: 2026-09-21
 
 ## Product direction
 
-Nara is a provider-neutral runtime for expressive physical AI companions.
+Nara is a provider-neutral runtime for an expressive physical AI companion. The first deployment is intended for a trusted partner, but the architecture must remain reusable for multiple people, devices, characters and households.
 
-The first real deployment is a companion device intended for a trusted partner. That is a launch profile, not a core architectural assumption. Nara must remain reusable for multiple people, households, characters, devices, and relationships.
-
-The public repository uses role names such as `owner`, `partner`, and `guest`. Real names, biographies, relationship details, private conversations, credentials, and personal memories belong in runtime-private storage, not Git.
+Real names, private biography, relationship details, credentials, recordings and personal memories must remain in runtime-private storage. Public Git uses generic role names such as `owner`, `partner` and `guest`.
 
 ## What is already real
 
-Server/runtime:
+### Runtime / server
 
 - physical firmware WebSocket handshake and Opus framing;
-- session-scoped Opus/PCM transcoding;
-- production `libopus-wasm` codec adapter;
+- session-scoped Opus/PCM transcoding using production `libopus-wasm`;
 - Gemini Live realtime voice adapter;
-- connect-time voice-provider fallback;
-- bounded playback pacing and interruption handling;
-- provider-neutral Action Runtime;
-- safe device actions through the firmware MCP compatibility layer;
-- normalized provider usage fields for token/cost accounting;
-- automated unit/integration coverage including a real-Opus firmware voice vertical slice;
-- typed connectivity capability contract separating cloud gateway, local gateway, direct peer and isolated modes;
-- persistent device lifecycle/claim registry with one-time device-bound claims, account + physical approval gates, hashed per-device credentials, rotation/revocation and gateway enforcement;
-- provider-neutral multi-person directory with exactly one primary person, up to six enrolled speaker profiles, and guest fallback;
-- conservative speaker-identity service contract that requires calibrated confidence + margin thresholds and never defaults an ambiguous voice to the primary person;
-- GitHub Releases-backed OTA catalog with cached manifests, per-device stable/beta channels and a firmware-compatible check endpoint;
-- first file-backed personal-memory store with subject/viewer-aware recall, explicit sharing, expiry, edit/delete, bounded retrieval, and persistence tests.
+- provider-neutral `VoiceProvider` / `VoiceSession` boundary;
+- ordered connect-time voice fallback;
+- bounded playback pacing, interruption and barge-in lifecycle;
+- provider usage/token accounting including cached versus uncached input where available;
+- provider-neutral Action Runtime with cancellation and compact tool schemas;
+- firmware MCP compatibility adapter isolated behind compact Nara aliases;
+- privacy-filtered `personal_memory_search` available to realtime voice;
+- Spotify Web API search/playback/queue/transport control behind media tools;
+- authenticated browser phone-audio bridge using a separate phone credential;
+- phone PCM framing and authorization-isolation integration tests;
+- phone bridge can use the phone OS audio route, including a TWS headset connected to the phone;
+- GitHub Releases-backed OTA catalog, stable/beta channel policy and device-authenticated OTA checks;
+- persistent device claim/credential lifecycle with hashed secrets, rotation and revocation;
+- provider-neutral person directory and conservative speaker-identity decision service;
+- runtime speaker recognition integration that remains personalization evidence rather than private-memory authorization;
+- file-backed personal memory with validation, subject/viewer access policy, sharing, expiry, bounded recall, edit/delete and fail-closed persistence;
+- content/context filtering tests proving unauthorized personal facts do not reach the model.
 
-Firmware:
+### Firmware / Waveshare 1.85B
 
-- standalone `man612/nara-firmware` repository;
-- Waveshare ESP32-S3-Touch-LCD-1.85B as the first target;
-- target builds in CI;
-- Nara face engine integrated into the target runtime;
-- inherited XiaoZhi lineage pinned/documented instead of remaining a GitHub fork.
+- standalone `man612/nara-firmware` repository with pinned XiaoZhi lineage;
+- full Waveshare ESP32-S3-Touch-LCD-1.85B compile in CI;
+- Nara parametric face integrated into the target runtime;
+- local blink/gaze/breathing and audio-driven mouth motion;
+- useful no-network startup: configured devices do not fall back into endless provisioning when known Wi-Fi is temporarily absent;
+- background saved-network scan/retry and automatic gateway recovery;
+- deliberate BOOT long-press recovery into Wi-Fi configuration;
+- physical CST816S/QMI8658 bring-up and local interaction path;
+- deterministic flip/shake/spin gesture classifier foundation;
+- local gesture reactions that do not require a gateway or AI tokens;
+- persistent per-gesture reaction configuration;
+- custom reaction sounds loaded from the asset partition;
+- private local `reaction-assets` staging directory excluded from public Git;
+- user/admin-only HTTPS complete-asset-pack install path using the existing asset partition updater;
+- BQ27220 battery-level integration and automatic low/critical battery policy;
+- face gaze target API prepared for external local vision;
+- firmware OTA verification including expected SHA-256/size and device credential reuse.
 
-## Current phase
+### Optional external local vision
 
-The transport, voice, provider, and first action vertical slices are far enough along that the next architectural priority is **identity + personal knowledge + context selection**.
+Implementation is merged in Nara Firmware and passed host checks, face-simulator tests and the full Waveshare 1.85B ESP-IDF build.
 
-Do not expand into many unrelated tools before a minimal memory/context path exists.
+It provides:
 
-Offline usefulness is now a core product requirement. The current firmware does not yet provide a real offline product mode; no-network startup still tends toward Wi-Fi configuration and cloud conversation depends on a reachable gateway. See `docs/OFFLINE_RUNTIME.md` and `docs/PHONE_CONNECTIVITY.md`.
+- small ESP-IDF-native SSCMA I2C transport at the documented default address `0x62`;
+- local invoke-without-image flow;
+- parsing compact detection boxes from an external SSCMA-compatible vision module;
+- confidence filtering, coordinate normalization, smoothing and target-loss timeout;
+- highest-confidence target -> Nara face gaze;
+- no continuous camera-frame upload to gateway/LLM for ordinary eye tracking;
+- host tests for gaze mapping and timeout behavior.
 
-Physical personality is also local-first. The server contract already has semantic touch/IMU event shapes, while the physical 1.85B firmware still needs a real CST816S/QMI8658 bridge and gesture classifiers. See `docs/PHYSICAL_INTERACTIONS.md`.
+Do not mark physical camera behavior calibrated until the actual external camera/module and enclosure exist.
 
-## Immediate work order
+## Current security boundaries
 
-### P0 — durable project context
-
-Status: complete in `feat/project-memory-foundation`.
-
-- project checkpoint lives in the repository;
-- decisions/research/hardware state have durable docs;
-- coding agents are instructed to read/update them;
-- filled personal profiles remain outside Git.
-
-### P1 — local personal-memory vertical slice
-
-Status: privacy/context boundary implemented; realtime voice integration and production person-directory persistence remain.
-
-Implemented in this branch:
-
-- typed personal fact model;
-- stable subject IDs;
-- viewer-aware recall;
-- explicit per-fact `shareWith`;
-- public/private/trusted/household labels;
-- expiry;
-- relevance cap;
-- persistent local JSON file adapter under the memory boundary;
-- edit/delete by stable fact ID;
-- tests for partner, guest, restart persistence, expiry, and bounded recall;
-- Zod validation for writes and persisted records;
-- explicit PersonalContextComposer/PersonalBrainService boundary;
-- least-privilege known-person viewer resolver;
-- provider-capture tests proving unauthorized facts never enter a brain request;
-- versioned file format that rejects unknown/invalid snapshots instead of silently migrating them.
-
-Still required before P1 is complete:
-
-- persist the production person/account directory in runtime-private storage;
-- wire the authenticated viewer/subject selection into an actual user-facing text path;
-- then integrate the same policy boundary into realtime voice transcript/context composition;
-- define an explicit migration tool before changing memory file version 1.
-
-First end-to-end scenario remains:
-
-> A trusted partner asks Nara a question about the owner. Nara retrieves only owner facts explicitly shareable with that partner and answers from those facts.
-
-### P2 — identity and context composer
-
-Status: device identity/credential foundation implemented; human account authentication, viewer resolution and context composition remain.
-
-Implemented identity foundation:
-
-- persistent runtime-private device registry;
-- `unclaimed -> claim_pending -> active/revoked` lifecycle;
-- one-time expiring claim transaction;
-- separate account approval and physical approval gates;
-- per-device credential issuance, hashing, rotation and revocation;
-- active/revoked enforcement at the firmware WebSocket edge;
-- legacy fleet token cannot impersonate an active device.
-
-Separate:
-
-- Nara/character identity ("who the companion is");
-- person profile ("who the humans are");
-- durable memory ("what has been learned");
-- project instructions ("how contributors build Nara").
-
-Build a context composer that selects the smallest relevant subset instead of concatenating all memory.
-
-### P3 — offline runtime foundation
-
-Status: foundation started; phone/connectivity architecture and typed degradation contract are implemented, device-side offline behavior is not yet implemented.
-
-Implemented foundation:
-
-- connectivity capability vocabulary: `online`, `local_gateway`, `peer_only`, `isolated`;
-- provisioning transports are distinct from runtime links;
-- phone connection hierarchy documented: Wi-Fi station/hotspot first, on-demand SoftAP direct peer, BLE/DPP for provisioning/on-demand roles;
-- tests lock the connectivity degradation priority.
-
-Next offline milestones:
-
-- wire connectivity status independently from interaction state in firmware;
-- useful no-network startup instead of a setup dead-end;
-- local clock/timer/alarm/status/navigation;
-- local physical reflex engine for touch/IMU;
-- authorized offline personal capsule;
-- reconnect/sync behavior;
-- direct-phone SoftAP + authenticated local web mode;
-- production provisioning migration/validation (DPP + secure BLE/SoftAP);
-- later local-network STT/brain/TTS.
-
-Do not promise unrestricted Indonesian STT/TTS on ESP32 alone; official ESP-SR command recognition is Chinese/English and its embedded TTS is Chinese-only.
-
-See `docs/OFFLINE_RUNTIME.md`.
-
-### P4 — memory in conversation
-
-Status: text-path privacy proof complete; guest/public realtime memory retrieval implemented behind the Action Runtime.
+### Device identity
 
 Implemented:
 
-- text-path context composition after access filtering;
-- realtime `personal_memory_search` tool exposed through the provider-neutral Action Runtime;
-- realtime memory viewer/subject are fixed server-side, not chosen by the model;
-- current voice path deliberately uses `person:guest`, so it can retrieve only public facts until strong viewer authentication is wired;
-- memory search results are compact and omit access-policy metadata.
+`unclaimed -> claim_pending -> active/revoked`
 
-Still required:
+The registry supports one-time expiring claim transactions, separate account/physical approval gates, per-device credentials, hashed storage, rotation and revocation. Once a device is active, the legacy fleet/bootstrap token cannot impersonate it.
 
-- bind a strong authenticated viewer signal from phone/account/physical approval into each voice session;
-- then allow trusted/private memory according to the same existing access policy;
-- add transcript -> memory-candidate review/normalization before durable writes;
-- keep raw transcripts optional and short-lived rather than storing every utterance forever.
+This proves **which Nara device** connected. It does not prove which human is currently speaking.
 
-### P5 — hardware-in-the-loop validation
+### Human/viewer identity
 
-Buy/use the target board and validate:
+Speaker recognition is deliberately not root authentication.
 
-- microphone capture;
-- echo cancellation;
-- speaker playback;
-- interruption/barge-in;
-- touch controller raw coordinates and gesture behavior;
-- IMU axis/orientation mapping;
-- pet/stroke classifier;
-- face-down/upside-down classifier;
-- shake/spin/knock classification and false-positive testing;
+Current realtime personal-memory tools bind the viewer server-side to `person:guest`. Therefore realtime speech can retrieve only facts shareable with a guest/public viewer.
+
+A strong phone/account/passkey or explicit physical approval signal is still required before trusted/private personal-memory privilege can be bound to a live session.
+
+The phone-audio bridge token authorizes that transport only. It also does not automatically grant trusted/private personal-memory access.
+
+## Connectivity state
+
+The runtime connectivity vocabulary remains:
+
+- `online`;
+- `local_gateway`;
+- `peer_only`;
+- `isolated`.
+
+Phone hotspot is ordinary saved Wi-Fi station connectivity. The firmware can now remain useful/alive when saved Wi-Fi is absent and recover automatically when it returns.
+
+A browser phone-audio bridge exists for an online/reachable Nara Gateway, but the production **ESP32-created secure SoftAP peer UI** is still a separate staged feature. Do not confuse those two paths.
+
+The inherited `78/esp-wifi-connect` configuration portal still uses an open SoftAP/plain HTTP model and must not be expanded into a private-data peer surface.
+
+## Physical personality
+
+Implemented in firmware:
+
+- local touch/IMU sensor path;
+- local gaze/touch behavior foundation;
+- flip/shake/spin classification;
+- local reaction emotion/sound policy;
+- persistent gesture-specific configuration;
+- custom local reaction sounds through assets.
+
+Still hardware-calibration dependent:
+
+- exact touch coordinate orientation;
+- pet/stroke thresholds;
+- face-down/upside-down orientation thresholds;
+- mild/strong shake distinction;
+- spin sensitivity;
+- casing knock versus table/speaker vibration;
 - pickup/set-down inference;
+- final-enclosure thresholds.
+
+Raw high-rate sensor streams should remain local. Cloud/LLM speech is optional enrichment after a local reflex, not the reflex itself.
+
+## Media and phone audio
+
+Spotify control is implemented server-side through the provider-neutral Action Runtime.
+
+The browser phone-audio bridge is implemented and CI-tested:
+
+`phone/TWS mic -> browser -> authenticated WebSocket -> VoiceSession -> provider`
+
+Provider output returns as PCM to browser Web Audio. The phone OS decides the actual output device, so a connected TWS can be used without pretending ESP32-S3 supports Bluetooth Classic/LE Audio.
+
+Still requires real-device validation:
+
+- Android/iOS browser microphone permissions over HTTPS;
+- real TWS routing;
+- echo cancellation behavior;
+- interruption latency;
+- background/screen-lock limitations;
+- browser resampling quality.
+
+## Offline state
+
+Already implemented:
+
+- no-network local idle rather than repeated setup dead-end;
+- background retry of saved Wi-Fi;
+- automatic recovery when a known network returns;
+- local face behavior;
+- local physical reactions;
+- local reaction sounds;
+- local battery policy.
+
+Still staged:
+
+- touch-driven local clock/timer/alarm UX;
+- offline personal capsule compiler/storage/search;
+- direct secure SoftAP peer UI on the ESP32;
+- local-network STT/LLM/TTS adapters;
+- production DPP / secure provisioning migration.
+
+Do not promise unrestricted Indonesian free-form STT/TTS on the ESP32-S3 alone. ESP-SR's supported command/TTS language limits still apply.
+
+## Remaining work order
+
+### P0 — hardware-in-the-loop validation
+
+This is now the largest unavoidable blocker.
+
+Validate on the real Waveshare board/final enclosure:
+
+- microphone capture and physical channel mapping;
+- AEC/reference path;
+- noise suppression / gain / clipping;
+- speaker loudness and distortion;
+- barge-in;
+- touch orientation and gesture behavior;
+- IMU axes and all motion thresholds;
+- battery gauge/charging semantics and battery life;
+- Wi-Fi reconnect/hotspot behavior;
 - sustained thermals/performance;
-- Wi-Fi reliability;
-- battery behavior if a battery is fitted;
-- physical ES7210 mic/reference channel mapping;
-- one-mic versus two-mic AFE path;
-- input gain/clipping;
-- AEC mode/NLP tuning;
-- noise-suppression/AGC experiments;
-- voice recognition under quiet/noisy/near/far conditions;
-- audio regression after the final enclosure is fitted.
+- phone/TWS browser path;
+- optional camera I2C, model coordinates, field of view and gaze orientation.
 
-Do not treat voice identity as a hard dependency: recognition failure must downgrade permissions/fall back to touch or phone confirmation rather than making the device unusable.
+CI proves code/build/protocol behavior; it cannot prove acoustics, radio conditions or physical sensor calibration.
 
-See `docs/HARDWARE_PLAN.md`, `docs/AUDIO_ROBUSTNESS.md`, and `docs/PHYSICAL_INTERACTIONS.md`.
+### P1 — strong human authorization
 
-### P6 — external knowledge and delegation
+Bind a strong authenticated human viewer to sessions before private/trusted memory is exposed.
 
-After memory/context is trustworthy:
+Required properties:
+
+- transport/device authentication is not enough;
+- speaker recognition remains a confidence signal only;
+- ambiguous identity fails down to guest, not up to owner/partner;
+- private-memory access uses the same existing viewer policy;
+- reset/transfer/revoke lifecycle remains explicit.
+
+Passkey-first account authentication remains the preferred product direction.
+
+### P2 — isolated-device utility/capsule UX
+
+Implement the richer no-network product layer:
+
+- RTC-backed clock/timer/alarm;
+- local navigation/status;
+- permission-filtered offline personal capsule;
+- deterministic local lookup;
+- local notes/messages/media;
+- reconnect refresh/sync.
+
+### P3 — production commissioning/direct peer
+
+Replace/contain the inherited open provisioning path before private direct-peer data exists:
+
+- secure SoftAP or ESP-IDF provisioning Security 2;
+- DPP where supported;
+- application/session authorization;
+- explicit physical activation;
+- short-lived credentials;
+- measured BLE lifecycle.
+
+### P4 — optional ecosystem expansion
+
+Only after the privacy/physical product path is dependable:
 
 - web/search adapter;
 - optional Hermes delegation;
-- additional voice providers;
-- reminders/calendar/home automation where useful.
+- additional voice providers such as GPT Live/chained local voice;
+- reminders/calendar/home automation;
+- richer local-network STT/LLM/TTS.
 
-### P7 — multi-person experience
+These are provider/features backlog, not blockers for validating the first physical Nara.
 
-Status: person-directory and speaker-identity decision foundation implemented; real provider adapter/enrollment and session integration remain.
+## OTA and assets
 
-Implemented:
+Firmware and reaction/content assets intentionally use separate update concepts.
 
-- exactly one primary person per device/profile directory;
-- explicit creator/household/trusted/guest roles;
-- up to six enabled enrolled voice profiles, with unlimited unknown people falling back to guest;
-- provider-neutral speaker recognition contract;
-- confidence + runner-up margin gates so ambiguous audio becomes unknown instead of being forced to the primary person;
-- minimum-audio gate so very short utterances do not waste recognition compute;
-- speaker recognition remains personalization evidence only and does not elevate private-memory authorization.
+Firmware OTA:
 
-Still required:
+- GitHub release catalog;
+- stable/beta policy;
+- device authorization;
+- expected SHA-256/size verification on device;
+- ESP image validation.
 
-- benchmark real speaker providers on Waveshare microphone audio (3D-Speaker/SpeechBrain/Picovoice candidates);
-- implement enrollment/re-enrollment/delete lifecycle;
-- bind low-risk personalization to recognized speaker;
-- bind strong phone/account/physical authentication separately for private-memory privilege;
-- add per-person preferences and proactive behavior;
-- validate household cross-talk, TV/replay audio, noisy rooms and false accept/reject behavior;
-- multiple devices/profiles without cloning the core runtime.
+Assets:
 
-## Known connectivity security blocker
+- separate asset partition;
+- local custom/private reaction sound staging;
+- full asset image replacement through a user/admin-only HTTPS install command;
+- conversational AI does not receive the generic asset installer.
 
-The inherited hotspot provisioning path from `78/esp-wifi-connect ~3.3.1` currently uses an open SoftAP and HTTP configuration portal. It is acceptable only as a development/reference path.
+The legacy asset format/layout checks are not equivalent to cryptographic publisher authenticity. Production asset signing/authenticity is still a hardening task.
 
-Before direct-phone peer mode can expose any private capsule/media/account data, Nara needs a separate authenticated peer surface with protected Wi-Fi and application/session authorization. Production Wi-Fi credential provisioning should migrate toward DPP or ESP-IDF Unified/Network Provisioning Security 2.
+## Hardware purchase gate
 
-See `docs/PHONE_CONNECTIVITY.md`.
+Software can no longer truthfully close the most important remaining unknowns without a real board.
 
-## Open decisions
+See `docs/HARDWARE_PLAN.md`.
 
-These are intentionally not treated as solved yet:
+For optional person-tracking gaze, the base Waveshare board has no camera. An external SSCMA-compatible local-vision module must be purchased/wired/tested separately if that capability is desired.
 
-- whether the first file-backed memory adapter remains the default or is replaced by a database;
-- encryption-at-rest implementation and key ownership;
-- how a device authenticates a trusted partner versus a guest;
-- exact server-side speaker-recognition provider/thresholds; voice match is only a confidence/personalization signal, not root authentication;
-- whether the 1.85B can and should expose both physical speech microphones plus playback reference to AFE after hardware validation;
-- import UX for large personal histories;
-- retention policy for raw transcripts;
-- how proactive speech should differ by viewer/profile;
-- exact local-network STT/TTS/LLM provider choices for Indonesian;
-- exact offline-capsule storage/index format and removable-media encryption scheme;
-- calibrated physical-gesture thresholds and whether body-wide capacitive touch is worth extra hardware later.
+## Open architectural decisions
 
-When one of these becomes a real architectural decision, record it in `docs/DECISIONS.md`.
+Still intentionally open:
+
+- concrete passkey/account service and recovery UX;
+- encryption-at-rest/key ownership for private memory;
+- first production offline-capsule format and removable-media protection;
+- exact local-network Indonesian STT/TTS/LLM stack;
+- final physical gesture thresholds;
+- whether two physical speech microphones plus playback reference should be exposed to the AFE after real capture analysis;
+- production asset-pack signing/authenticity;
+- external vision model/module choice and mounting.
+
+Record a decision in `docs/DECISIONS.md` once evidence is sufficient.
 
 ## Checkpoint discipline
 
-At the end of a meaningful implementation batch:
+After a meaningful implementation batch:
 
-1. update the "What is already real" section if capabilities changed;
-2. move completed priority items forward instead of leaving stale TODOs;
-3. record blockers or unresolved risks;
-4. add architecture decisions to `docs/DECISIONS.md`;
-5. add significant external research to `docs/RESEARCH_SOURCES.md`;
-6. update `docs/HARDWARE_PLAN.md` if the buy/test state changed;
-7. keep README status truthful.
+1. update this file and README;
+2. remove stale TODOs rather than leaving contradictory history;
+3. distinguish CI-tested software from HIL-tested physical behavior;
+4. add external technical findings to `docs/RESEARCH_SOURCES.md`;
+5. update `docs/HARDWARE_PLAN.md` when hardware state changes;
+6. keep private data out of Git.
 
-A coding agent should be able to open the repository tomorrow and reconstruct the current direction without reading the conversation that produced it.
-
-
-## OTA distribution checkpoint
-
-The server now has the distribution-side contract needed for remote firmware updates without AI usage:
-
-```text
-nara-firmware tag
-  -> GitHub release manifest/artifact
-  -> cached Nara OTA catalog
-  -> per-device stable/beta policy
-  -> /api/ota/check
-  -> ESP32 A/B updater
-```
-
-Stable is the default channel. Beta is opt-in per device through an authenticated admin endpoint. The check path uses board/version from the firmware user-agent and returns the existing firmware-compatible `firmware.version/url/force` shape plus manifest integrity metadata.
-
-Still required before production OTA is considered hardened:
-
-- merge/validate the firmware release publisher;
-- add device-credential authorization to OTA checks for claimed devices where practical;
-- verify manifest SHA-256 on-device in addition to ESP image validation;
-- provision signed-app/Secure Boot + flash-encryption policy deliberately on production hardware;
-- define staged/cohort rollout beyond stable/beta if multiple recipient devices exist.
+A new coding agent should be able to reconstruct the current project state from the repository without reading the conversation that produced it.

@@ -31,7 +31,15 @@ Read this before broad code search.
 - `src/memory/context.ts` — access-filtered context composer and text-path brain service; raw storage must not be concatenated into prompts.
 - `src/memory/tool-provider.ts` — viewer/subject-bound realtime memory search tool; identity parameters are fixed server-side rather than supplied by the model.
 - `src/identity/people.ts` — least-privilege viewer resolver; authenticated/verified identities may resolve, speaker guesses alone remain guest.
-- `tests/personal-memory.test.ts` — privacy, partner/guest, persistence, expiry, edit/delete, and recall-limit coverage.
+- `tests/personal-memory.test.ts`
+- `tests/device-mcp-tools.test.ts`
+- `tests/phone-protocol.test.ts`
+- `tests/phone-gateway.integration.test.ts`
+- `tests/media-tool-provider.test.ts`
+- `tests/spotify-provider.test.ts`
+- `tests/speaker-identity.test.ts`
+- `tests/speaker-turn.test.ts`
+- `tests/ota-http.test.ts` — privacy, partner/guest, persistence, expiry, edit/delete, and recall-limit coverage.
 - `tests/memory-context.test.ts` — persisted-record validation, viewer-resolution and provider-capture proof that unauthorized facts never enter model requests.
 - `tests/memory-tool-provider.test.ts` — realtime memory tool binding, response minimization and query validation.
 - `data/` — intended runtime-private state boundary; gitignored and never a source file directory.
@@ -44,11 +52,26 @@ The current file adapter is a replaceable first implementation, not permission t
 - `src/device/firmware-wire.ts` — physical firmware hello/auth helpers and WebSocket Opus v1/v2/v3 framing.
 - `src/device/audio-pacer.ts` — bounded 60 ms playback pacing with a short prebuffer.
 - `src/device/voice-bridge.ts` — per-device firmware ↔ codec ↔ VoiceSession lifecycle bridge.
+- `src/device/mcp-tools.ts` — compact validated aliases over firmware MCP, including device status/volume and local-reflex customization.
+- `src/phone/protocol.ts` — bounded PCM16 framing for the authenticated browser phone-audio path.
+- `src/phone/voice-bridge.ts` — phone/browser ↔ provider-neutral VoiceSession bridge.
+- `phone-bridge/index.html` — browser mic/playback client; phone OS routing may use a connected TWS.
+- `src/media/spotify.ts` — Spotify Web API implementation.
+- `src/media/tool-provider.ts` — compact provider-neutral media actions.
 - `src/audio/codec.ts` — stable session-scoped audio codec interfaces.
 - `src/audio/streaming-opus.ts` — PCM16 frame accumulation and provider↔device streaming codec glue.
 - `src/audio/libopus-wasm.ts` — first production Opus primitive implementation; package/platform details stay behind the codec boundary.
 - `docs/DEVICE_PROTOCOL.md` — stable firmware↔gateway wire contract and compatibility notes.
 - `virtual-device/index.html` — lightweight semantic protocol/dev console; it is not a binary-audio firmware emulator.
+
+## Identity, media and updates
+
+- `src/identity/directory.ts` / `src/identity/file-directory.ts` — runtime-private person directory boundary.
+- `src/identity/speaker.ts` / `src/identity/speaker-turn.ts` — conservative speaker-identification decision/session layer; never root auth.
+- `src/ota/catalog.ts` — GitHub Releases-backed OTA catalog.
+- `src/ota/channels.ts` — per-device stable/beta update channel policy.
+- `src/ota/http.ts` — firmware-compatible authenticated OTA HTTP surface.
+- `src/content/personal-content.ts` / `src/content/http.ts` — scoped personal-content authoring surface.
 
 ## Configuration
 

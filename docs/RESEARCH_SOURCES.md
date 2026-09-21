@@ -2,6 +2,30 @@
 
 This is a compact record so future contributors and coding agents do not repeat the same research.
 
+
+## SSCMA local vision / Grove Vision AI Module V2
+
+Purpose: add optional local person/object-following gaze without pretending the base Waveshare board has an onboard camera or continuously uploading camera frames to an LLM.
+
+Useful findings:
+
+- Seeed's SSCMA Arduino reference uses default I2C address `0x62`;
+- the protocol supports an `INVOKE` command and compact detection outputs such as boxes/classes/points;
+- detection boxes expose center coordinates plus size, score and target ID;
+- the Waveshare 1.85B exposes the shared I2C bus used by onboard peripherals, and the researched SSCMA default address does not collide with the currently used onboard addresses;
+- inference can remain on the external module while Nara consumes only compact coordinates.
+
+Decision:
+
+Nara uses a small ESP-IDF-native SSCMA I2C adapter rather than importing Arduino into the firmware. Ordinary eye tracking consumes local detection boxes, normalizes/smooths the best target and drives the face gaze API. Camera frames are not sent to the gateway/LLM merely to move the eyes.
+
+Physical module choice, deployed model, power wiring, image coordinate dimensions, field of view and mounting orientation remain hardware-validation items.
+
+References:
+
+- https://github.com/Seeed-Studio/Seeed_Arduino_SSCMA
+- https://wiki.seeedstudio.com/grove_vision_ai_v2/
+
 ## Hermes Agent / SOUL.md + USER.md + MEMORY.md
 
 Purpose: reference for separating agent identity, user profile, learned memory, and project instructions.
