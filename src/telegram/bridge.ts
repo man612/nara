@@ -110,7 +110,7 @@ export class TelegramBridge {
         timeout: this.options.pollTimeoutSeconds ?? 25,
         allowed_updates: ["message"]
       },
-      ...(signal ? { ...(signal ? { signal } : {}) } : {})
+      signal
     );
 
     for (const update of updates) {
@@ -312,7 +312,7 @@ export class TelegramBridge {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
-        ...(signal ? { ...(signal ? { signal } : {}) } : {})
+        signal
       }
     );
     if (!response.ok) {
