@@ -33,7 +33,8 @@ describe("DeviceMcpToolProvider", () => {
       expect.arrayContaining([
         expect.objectContaining({ name: "device_get_status", effect: "read" }),
         expect.objectContaining({ name: "device_set_volume", effect: "write" }),
-        expect.objectContaining({ name: "device_set_reflex", effect: "write" })
+        expect.objectContaining({ name: "device_set_reflex", effect: "write" }),
+        expect.objectContaining({ name: "device_offline_utility", effect: "write" })
       ])
     );
 
@@ -61,9 +62,88 @@ describe("DeviceMcpToolProvider", () => {
       )
     ).resolves.toMatchObject({
       ok: false,
-      error: "gesture must be flip, shake, or spin"
+      error:
+        "gesture must be flip, shake, spin, tap, double_tap, hold, stroke, or pet"
+    });
+
+    await expect(
+      provider.callTool(
+        {
+          name: "device_offline_utility",
+          arguments: { action: "timer", seconds: 0 },
+          callId: "bad-timer"
+        },
+        new AbortController().signal
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      error: "seconds must be an integer from 1 to 86400"
+    });
+
+    await expect(
+      provider.callTool(
+        {
+          name: "device_offline_utility",
+          arguments: { action: "alarm", hour: 7 },
+          callId: "bad-alarm"
+        },
+        new AbortController().signal
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      error: "minute must be an integer from 0 to 59"
     });
     expect(sent).toHaveLength(0);
+  });
+
+
+  it("accepts touch reflex and offline utility arguments before device discovery", async () => {
+    const { sent, transport } = createTransport();
+    const provider = new DeviceMcpToolProvider(transport);
+
+    const reflex = provider.callTool(
+      {
+        name: "device_set_reflex",
+        arguments: {
+          gesture: "pet",
+          emotion: "happy",
+          sound: "asset:meow.ogg"
+        },
+        callId: "pet-1"
+      },
+      new AbortController().signal
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(payloadAt(sent, 0)).toMatchObject({
+      method: "initialize"
+    });
+    await provider.close();
+    await expect(reflex).resolves.toMatchObject({
+      ok: false
+    });
+
+    const second = createTransport();
+    const offline = new DeviceMcpToolProvider(second.transport);
+    const call = offline.callTool(
+      {
+        name: "device_offline_utility",
+        arguments: {
+          action: "timezone",
+          timezone_offset_minutes: 420
+        },
+        callId: "tz-1"
+      },
+      new AbortController().signal
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(payloadAt(second.sent, 0)).toMatchObject({
+      method: "initialize"
+    });
+    await offline.close();
+    await expect(call).resolves.toMatchObject({
+      ok: false
+    });
   });
 
   it("negotiates legacy MCP, discovers the target, calls it, and compacts the result", async () => {
