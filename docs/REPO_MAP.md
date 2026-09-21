@@ -27,8 +27,11 @@ Read this before broad code search.
 
 ## Personal memory
 
-- `src/memory/personal.ts` — first local personal-memory adapter: subject/viewer-aware access filtering, bounded lexical recall, expiry, edit/delete, and file persistence.
+- `src/memory/personal.ts` — validated local personal-memory adapter: subject/viewer-aware access filtering, bounded lexical recall, expiry, edit/delete, and versioned file persistence.
+- `src/memory/context.ts` — access-filtered context composer and text-path brain service; raw storage must not be concatenated into prompts.
+- `src/identity/people.ts` — least-privilege viewer resolver; authenticated/verified identities may resolve, speaker guesses alone remain guest.
 - `tests/personal-memory.test.ts` — privacy, partner/guest, persistence, expiry, edit/delete, and recall-limit coverage.
+- `tests/memory-context.test.ts` — persisted-record validation, viewer-resolution and provider-capture proof that unauthorized facts never enter model requests.
 - `data/` — intended runtime-private state boundary; gitignored and never a source file directory.
 
 The current file adapter is a replaceable first implementation, not permission to bypass the memory boundary elsewhere.

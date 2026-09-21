@@ -208,3 +208,43 @@ The personal-memory layer is not done until tests prove at least:
 6. retrieval returns only a small capped context;
 7. facts can be edited/deleted;
 8. storage survives a process restart.
+
+
+## Implemented context boundary
+
+The first implementation now treats access filtering as a hard code boundary rather than a prompt convention.
+
+Flow:
+
+```text
+authenticated/verified viewer signal
+        |
+        v
+KnownPersonResolver
+        |
+        | unknown / voice-only guess -> guest
+        v
+PersonalMemoryStore.recall()
+        |
+        | subject + expiry + access policy + relevance + limit
+        v
+authorized facts only
+        |
+        v
+PersonalContextComposer
+        |
+        v
+BrainProvider
+```
+
+Important constraints:
+
+- the persisted JSON file is validated before records are accepted;
+- writes are validated before persistence;
+- unknown/invalid file versions fail closed rather than being silently trusted;
+- speaker recognition alone does not elevate a viewer for personal-memory access;
+- the context composer receives only the store's already-filtered recall result;
+- tests capture the actual downstream brain request and assert that unauthorized marker text is absent;
+- memory text is serialized as reference data and explicitly marked as data rather than instructions.
+
+The current file format remains version 1. A future storage-format change must ship with an explicit migration path; do not silently reinterpret unknown versions.

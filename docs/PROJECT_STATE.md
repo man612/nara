@@ -64,7 +64,7 @@ Status: complete in `feat/project-memory-foundation`.
 
 ### P1 — local personal-memory vertical slice
 
-Status: started.
+Status: privacy/context boundary implemented; realtime voice integration and production person-directory persistence remain.
 
 Implemented in this branch:
 
@@ -77,16 +77,19 @@ Implemented in this branch:
 - relevance cap;
 - persistent local JSON file adapter under the memory boundary;
 - edit/delete by stable fact ID;
-- tests for partner, guest, restart persistence, expiry, and bounded recall.
+- tests for partner, guest, restart persistence, expiry, and bounded recall;
+- Zod validation for writes and persisted records;
+- explicit PersonalContextComposer/PersonalBrainService boundary;
+- least-privilege known-person viewer resolver;
+- provider-capture tests proving unauthorized facts never enter a brain request;
+- versioned file format that rejects unknown/invalid snapshots instead of silently migrating them.
 
 Still required before P1 is complete:
 
-- choose/wire the runtime-private storage path under `data/`;
-- validate stored records instead of trusting arbitrary file JSON;
-- expose a small service/context API rather than wiring the file adapter directly into voice;
-- add a known-person/viewer resolver;
-- prove unauthorized facts cannot reach a brain request;
-- decide migration strategy if the first file format is replaced later.
+- persist the production person/account directory in runtime-private storage;
+- wire the authenticated viewer/subject selection into an actual user-facing text path;
+- then integrate the same policy boundary into realtime voice transcript/context composition;
+- define an explicit migration tool before changing memory file version 1.
 
 First end-to-end scenario remains:
 
