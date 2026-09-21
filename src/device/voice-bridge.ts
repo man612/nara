@@ -3,7 +3,12 @@ import type {
   AudioCodecSession
 } from "../audio/codec.js";
 import { ActionRuntime } from "../actions/runtime.js";
-import type { ToolProvider } from "../actions/contracts.js";
+import type {
+  ToolCall,
+  ToolProvider,
+  ToolResult
+} from "../actions/contracts.js";
+import type { FirmwareVoiceControl } from "./voice-control.js";
 import type {
   ProviderUsage,
   VoiceProvider,
@@ -35,6 +40,16 @@ export type FirmwareVoiceBridgeOptions = {
   onError?: (
     session: FirmwareSessionInfo,
     error: Error
+  ) => void | Promise<void>;
+  onControlReady?: (
+    session: FirmwareSessionInfo,
+    control: FirmwareVoiceControl
+  ) => void;
+  onControlClosed?: (session: FirmwareSessionInfo) => void;
+  onOutputTranscript?: (
+    session: FirmwareSessionInfo,
+    text: string,
+    final: boolean
   ) => void | Promise<void>;
 
   /**
@@ -164,6 +179,8 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
       this.voice.close()
     ]);
 
+    this.options.onControlClosed?.(this.session);
+
     for (const result of results) {
       if (result.status === "rejected") {
         await this.reportError(
@@ -173,6 +190,43 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
         );
       }
     }
+  }
+
+  async sendText(text: string): Promise<void> {
+    if (this.closed) {
+      throw new Error("Firmware voice session is closed");
+    }
+    if (!this.voice.sendText) {
+      throw new Error("Current voice provider does not support text injection");
+    }
+    await this.voice.sendText(text);
+  }
+
+  async executeTool(call: ToolCall): Promise<ToolResult> {
+    if (this.closed) {
+      return {
+        name: call.name,
+        ok: false,
+        ...(call.callId ? { callId: call.callId } : {}),
+        error: "Firmware voice session is closed"
+      };
+    }
+    if (!this.actions) {
+      return {
+        name: call.name,
+        ok: false,
+        ...(call.callId ? { callId: call.callId } : {}),
+        error: "No action runtime is available for this session"
+      };
+    }
+    return this.actions.execute(call);
+  }
+
+  async interrupt(): Promise<void> {
+    if (this.closed) return;
+    this.suppressOutput = true;
+    await this.interruptPlayback();
+    await this.voice.interrupt();
   }
 
   private async handleVoiceEvent(event: VoiceSessionEvent): Promise<void> {
@@ -253,8 +307,15 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
         return;
       }
 
-      case "output.started":
       case "output.transcript":
+        await this.options.onOutputTranscript?.(
+          this.session,
+          event.text,
+          event.final
+        );
+        return;
+
+      case "output.started":
         return;
     }
   }
@@ -442,7 +503,7 @@ export class FirmwareVoiceBridge {
     const speakerRecognizer =
       this.options.createSpeakerRecognizer?.(session);
 
-    return new FirmwareVoiceSession(
+    const handler = new FirmwareVoiceSession(
       session,
       transport,
       codec,
@@ -451,5 +512,7 @@ export class FirmwareVoiceBridge {
       speakerRecognizer,
       this.options
     );
+    this.options.onControlReady?.(session, handler);
+    return handler;
   };
 }
