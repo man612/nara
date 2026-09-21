@@ -15,6 +15,8 @@ import type {
   FirmwareSessionInfo,
   FirmwareSessionTransport
 } from "../gateway.js";
+import type { SpeakerIdentityDecision } from "../identity/speaker.js";
+import { SpeakerTurnRecognizer } from "../identity/speaker-turn.js";
 import { RealtimePacketPacer } from "./audio-pacer.js";
 import { DeviceMcpToolProvider } from "./mcp-tools.js";
 
@@ -44,6 +46,14 @@ export type FirmwareVoiceBridgeOptions = {
     session: FirmwareSessionInfo,
     transport: FirmwareSessionTransport
   ) => ToolProvider[] | Promise<ToolProvider[]>;
+
+  createSpeakerRecognizer?: (
+    session: FirmwareSessionInfo
+  ) => SpeakerTurnRecognizer | undefined;
+  onSpeakerIdentity?: (
+    session: FirmwareSessionInfo,
+    decision: SpeakerIdentityDecision
+  ) => void | Promise<void>;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -54,6 +64,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
   private readonly pacer: RealtimePacketPacer;
   private readonly unsubscribeVoice: () => void;
   private readonly toolTasks = new Set<Promise<void>>();
+  private readonly speakerTasks = new Set<Promise<void>>();
   private readonly cancelledToolCalls = new Set<string>();
   private voiceEventChain: Promise<void> = Promise.resolve();
   private playbackGeneration = 0;
@@ -67,6 +78,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     private readonly codec: AudioCodecSession,
     private readonly voice: VoiceSession,
     private readonly actions: ActionRuntime | null,
+    private readonly speakerRecognizer: SpeakerTurnRecognizer | undefined,
     private readonly options: FirmwareVoiceBridgeOptions
   ) {
     this.pacer = new RealtimePacketPacer({
@@ -96,6 +108,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
   async onAudio(frame: { payload: Uint8Array; timestamp: number }): Promise<void> {
     if (this.closed) return;
     const pcm = await this.codec.decodeUplink(frame.payload);
+    this.speakerRecognizer?.pushAudio(pcm);
     await this.voice.sendAudio(pcm);
   }
 
@@ -139,11 +152,12 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     this.outputActive = false;
     this.unsubscribeVoice();
     this.pacer.close();
+    this.speakerRecognizer?.close();
 
     await this.actions?.close();
 
     await this.voiceEventChain.catch(() => undefined);
-    await Promise.allSettled([...this.toolTasks]);
+    await Promise.allSettled([...this.toolTasks, ...this.speakerTasks]);
 
     const results = await Promise.allSettled([
       this.codec.close(),
@@ -225,11 +239,38 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
         await this.reportError(new Error(event.message));
         return;
 
+      case "speech.started":
+        this.speakerRecognizer?.speechStarted();
+        return;
+
+      case "speech.stopped": {
+        if (!this.speakerRecognizer) return;
+        const task = this.identifySpeakerTurn();
+        this.speakerTasks.add(task);
+        void task.finally(() => {
+          this.speakerTasks.delete(task);
+        });
+        return;
+      }
+
       case "output.started":
       case "output.transcript":
-      case "speech.started":
-      case "speech.stopped":
         return;
+    }
+  }
+
+  private async identifySpeakerTurn(): Promise<void> {
+    try {
+      const decision = await this.speakerRecognizer?.speechStopped();
+      if (!decision || this.closed) return;
+      await this.options.onSpeakerIdentity?.(this.session, decision);
+    } catch (error) {
+      if (this.closed) return;
+      await this.reportError(
+        error instanceof Error
+          ? error
+          : new Error("Speaker identity failed")
+      );
     }
   }
 
@@ -398,12 +439,16 @@ export class FirmwareVoiceBridge {
       throw error;
     }
 
+    const speakerRecognizer =
+      this.options.createSpeakerRecognizer?.(session);
+
     return new FirmwareVoiceSession(
       session,
       transport,
       codec,
       voice,
       actions,
+      speakerRecognizer,
       this.options
     );
   };
