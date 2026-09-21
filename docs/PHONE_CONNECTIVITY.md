@@ -1,6 +1,6 @@
 # Phone connectivity and commissioning
 
-Status: accepted product direction; connectivity contract foundation implemented, device-side flows remain staged.
+Status: accepted product direction; connectivity and useful no-network foundations implemented, direct peer/provisioning hardening remains staged.
 
 Last reviewed: 2026-09-21
 
@@ -12,6 +12,7 @@ Implemented now:
 - phone hotspot works as ordinary saved Wi-Fi station connectivity;
 - configured firmware stays out of an endless provisioning loop when saved Wi-Fi is temporarily absent;
 - saved-network retry/recovery is automatic;
+- isolated firmware now has RTC-backed clock/timer/alarm primitives and local touch shortcuts;
 - an authenticated browser `/phone` audio bridge exists on Nara Gateway;
 - the browser bridge has a credential distinct from ESP32 device credentials;
 - phone-only authorization cannot impersonate firmware;
@@ -369,15 +370,26 @@ Implemented:
 
 ### C1 — firmware identity cleanup
 
-- Nara SSID/hostname prefix everywhere;
-- Nara BLE provisioning name;
-- remove remaining user-visible XiaoZhi setup branding.
+Implemented:
+
+- Nara SSID/hostname prefix on the current target path;
+- Nara BLE provisioning name on the current target path;
+- current user-visible setup branding moved to Nara naming.
 
 ### C2 — useful no-network startup
 
-- stop treating temporary Wi-Fi failure as permanent first-use setup;
-- introduce device-local offline UI;
-- retain explicit action to enter provisioning.
+Implemented foundation:
+
+- temporary Wi-Fi failure no longer behaves like permanent first-use setup;
+- saved-network retry/recovery continues in the background;
+- BOOT long-press remains an explicit provisioning/recovery action;
+- isolated mode keeps local face/touch/IMU behavior alive;
+- RTC-backed clock/timer/alarm primitives and touch shortcuts are available.
+
+Still staged:
+
+- richer local navigation/status UI;
+- offline capsule browsing and media UX.
 
 ### C3 — direct-phone SoftAP
 
