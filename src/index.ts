@@ -70,6 +70,10 @@ async function createFirmwareVoiceFactory(
       console.log(
         `[firmware:${session.sessionId}] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`
       );
+      companion.recordVoiceUsage(
+        "firmware:" + session.sessionId,
+        usage
+      );
     },
     onToolCall: (session, event) => {
       console.log(
@@ -158,6 +162,10 @@ async function createPhoneVoiceFactory(
     onUsage: (usage) => {
       console.log(
         `[phone] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`
+      );
+      companion.recordVoiceUsage(
+        "phone:" + voiceProvider.id,
+        usage
       );
     }
   });

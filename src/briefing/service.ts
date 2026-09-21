@@ -2,6 +2,10 @@ import type {
   ProviderBudgetMonitor,
   ProviderBudgetSnapshot
 } from "../budget/monitor.js";
+import type {
+  DailyTokenBudget,
+  DailyTokenBudgetSnapshot
+} from "../budget/token-ledger.js";
 import type { HermesAgentClient } from "../agents/hermes.js";
 import type {
   VoiceLatencyMonitor,
@@ -16,6 +20,7 @@ import {
 export type BriefingSnapshot = {
   weather?: WeatherSnapshot;
   budgets: ProviderBudgetSnapshot[];
+  voiceTokenBudget?: DailyTokenBudgetSnapshot;
   latency: VoiceLatencySummary;
   hermesAvailable?: boolean;
   generatedAt: string;
@@ -26,6 +31,7 @@ export class BriefingService {
     private readonly options: {
       weather?: OpenMeteoWeatherClient;
       budgets?: ProviderBudgetMonitor;
+      tokenBudget?: DailyTokenBudget;
       latency: VoiceLatencyMonitor;
       hermes?: HermesAgentClient;
       deviceId?: string;
@@ -48,6 +54,9 @@ export class BriefingService {
         budgetResult.status === "fulfilled"
           ? budgetResult.value
           : [],
+      ...(this.options.tokenBudget
+        ? { voiceTokenBudget: this.options.tokenBudget.snapshot() }
+        : {}),
       latency: this.options.latency.summary(this.options.deviceId),
       ...(hermesResult.status === "fulfilled" &&
       hermesResult.value !== undefined
@@ -92,6 +101,19 @@ export class BriefingService {
       );
     } else if (snapshot.budgets.length > 0) {
       parts.push("Budget AI yang dipantau masih aman.");
+    }
+
+    if (snapshot.voiceTokenBudget) {
+      const token = snapshot.voiceTokenBudget;
+      parts.push(
+        "Budget token suara lokal hari ini terpakai " +
+          Math.round(token.percentUsed) +
+          " persen, sisa sekitar " +
+          token.remainingTokens.toLocaleString("id-ID") +
+          " token dari batas " +
+          token.limitTokens.toLocaleString("id-ID") +
+          "."
+      );
     }
 
     if (snapshot.latency.deviceFirstPacketMs) {

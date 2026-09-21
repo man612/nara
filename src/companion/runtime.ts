@@ -9,6 +9,8 @@ import {
   DailyBriefingScheduler
 } from "../briefing/service.js";
 import { OpenMeteoWeatherClient } from "../briefing/weather.js";
+import type { ProviderUsage } from "../contracts/providers.js";
+import { DailyTokenBudget } from "../budget/token-ledger.js";
 import {
   DeepSeekBudgetSource,
   OpenRouterBudgetSource,
@@ -84,6 +86,7 @@ export class CompanionRuntime {
   private hermesTools?: HermesAgentToolProvider;
   private budgets?: ProviderBudgetMonitor;
   private budgetWatch?: ProviderBudgetWatch;
+  private tokenBudget?: DailyTokenBudget;
   private weather?: OpenMeteoWeatherClient;
   private telegram?: TelegramBridge;
   private dailyBriefing?: DailyBriefingScheduler;
@@ -104,6 +107,7 @@ export class CompanionRuntime {
         briefing,
         ...(this.weather ? { weather: this.weather } : {}),
         ...(this.budgets ? { budgets: this.budgets } : {}),
+        ...(this.tokenBudget ? { tokenBudget: this.tokenBudget } : {}),
         latency: this.latency,
         ...(this.hermes ? { hermes: this.hermes } : {}),
         ...(deviceId ? { deviceId } : {})
@@ -125,6 +129,25 @@ export class CompanionRuntime {
 
   recordLatency(sample: VoiceLatencySample): void {
     this.latency.record(sample);
+  }
+
+  recordVoiceUsage(streamId: string, usage: ProviderUsage): void {
+    if (!this.tokenBudget) return;
+    const total =
+      usage.totalTokens ??
+      (usage.inputTokens !== undefined ||
+      usage.outputTokens !== undefined
+        ? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0)
+        : undefined);
+    if (total === undefined) return;
+
+    const update = this.tokenBudget.recordCumulative(
+      streamId,
+      total
+    );
+    if (update.changedLevel && update.level !== "ok") {
+      void this.handleTokenBudgetWarning(update);
+    }
   }
 
   async handleOutputTranscript(
@@ -156,6 +179,9 @@ export class CompanionRuntime {
         : []),
       ...(this.budgets
         ? ["AI budget:         provider balance monitoring enabled"]
+        : []),
+      ...(this.tokenBudget
+        ? ["Voice token budget: local daily usage guard enabled"]
         : []),
       ...(this.hermes
         ? ["Hermes agent:      Runs API delegation enabled"]
@@ -223,6 +249,33 @@ export class CompanionRuntime {
         timezone: weatherValues.timezone
       });
       this.briefingTimezone = weatherValues.timezone;
+    }
+
+    const dailyTokenLimit = nonEmpty(
+      "NARA_VOICE_DAILY_TOKEN_BUDGET"
+    );
+    if (dailyTokenLimit) {
+      const limit = Number(dailyTokenLimit);
+      if (!Number.isSafeInteger(limit) || limit <= 0) {
+        throw new Error(
+          "NARA_VOICE_DAILY_TOKEN_BUDGET must be a positive integer"
+        );
+      }
+      this.tokenBudget = new DailyTokenBudget({
+        limitTokens: limit,
+        lowFraction: numberEnv(
+          "NARA_VOICE_TOKEN_BUDGET_LOW_FRACTION",
+          0.8
+        ),
+        criticalFraction: numberEnv(
+          "NARA_VOICE_TOKEN_BUDGET_CRITICAL_FRACTION",
+          0.95
+        ),
+        timeZone:
+          nonEmpty("NARA_VOICE_TOKEN_BUDGET_TIMEZONE") ??
+          weatherValues.timezone ??
+          "UTC"
+      });
     }
 
     const lowUsd = numberEnv("NARA_AI_BUDGET_LOW_USD", 2);
@@ -305,6 +358,7 @@ export class CompanionRuntime {
     return new BriefingService({
       ...(this.weather ? { weather: this.weather } : {}),
       ...(this.budgets ? { budgets: this.budgets } : {}),
+      ...(this.tokenBudget ? { tokenBudget: this.tokenBudget } : {}),
       latency: this.latency,
       ...(this.hermes ? { hermes: this.hermes } : {}),
       ...(deviceId ? { deviceId } : {})
@@ -393,6 +447,49 @@ export class CompanionRuntime {
           JSON.stringify(text),
         this.targetDeviceId
       );
+    }
+  }
+
+  private async handleTokenBudgetWarning(
+    snapshot: ReturnType<DailyTokenBudget["snapshot"]>
+  ): Promise<void> {
+    const text =
+      snapshot.level === "exhausted"
+        ? "Batas token suara harian Nara sudah tercapai."
+        : snapshot.level === "critical"
+          ? "Token suara harian Nara hampir habis."
+          : "Token suara harian Nara mulai menipis.";
+    const detail =
+      text +
+      " Sisa sekitar " +
+      snapshot.remainingTokens.toLocaleString("id-ID") +
+      " dari " +
+      snapshot.limitTokens.toLocaleString("id-ID") +
+      " token.";
+
+    const result = await this.voiceControls.executeTool(
+      {
+        name: "device_companion",
+        arguments: {
+          op: "notify",
+          text: detail.slice(0, 220),
+          emotion:
+            snapshot.level === "exhausted" ||
+            snapshot.level === "critical"
+              ? "sad"
+              : "surprised",
+          sound: "builtin:exclamation"
+        },
+        callId:
+          "voice-token-budget-" +
+          snapshot.localDate +
+          "-" +
+          snapshot.level
+      },
+      this.targetDeviceId
+    );
+    if (!result?.ok) {
+      console.warn("[budget] local voice-token warning unavailable");
     }
   }
 
