@@ -104,6 +104,8 @@ Reasons:
 
 A later native Nara app may justify persistent/on-demand GATT services, but that should be measured on the real Waveshare device first.
 
+A particularly relevant production reference is Home Assistant Voice Preview Edition: its factory ESPHome configuration re-enables BLE when Wi-Fi disconnects, disables BLE shortly after Wi-Fi connects, and waits for BLE to be disabled before the voice-assistant client proceeds. Nara should benchmark a similar **BLE-for-setup/recovery, off-for-normal-voice** lifecycle on the 1.85B rather than inventing an always-on policy.
+
 ## Connectivity capability model
 
 Connectivity is independent from the face/conversation interaction state.
