@@ -47,6 +47,8 @@ Do not expand into many unrelated tools before a minimal memory/context path exi
 
 Offline usefulness is now a core product requirement. The current firmware does not yet provide a real offline product mode; no-network startup still tends toward Wi-Fi configuration and cloud conversation depends on a reachable gateway. See `docs/OFFLINE_RUNTIME.md`.
 
+Physical personality is also local-first. The server contract already has semantic touch/IMU event shapes, while the physical 1.85B firmware still needs a real CST816S/QMI8658 bridge and gesture classifiers. See `docs/PHYSICAL_INTERACTIONS.md`.
+
 ## Immediate work order
 
 ### P0 — durable project context
@@ -108,6 +110,7 @@ Next offline milestones:
 - separate connectivity status from interaction state;
 - useful no-network startup instead of a setup dead-end;
 - local clock/timer/alarm/status/navigation;
+- local physical reflex engine for touch/IMU;
 - authorized offline personal capsule;
 - reconnect/sync behavior;
 - optional direct-phone peer mode;
@@ -132,8 +135,12 @@ Buy/use the target board and validate:
 - echo cancellation;
 - speaker playback;
 - interruption/barge-in;
-- touch;
-- IMU orientation;
+- touch controller raw coordinates and gesture behavior;
+- IMU axis/orientation mapping;
+- pet/stroke classifier;
+- face-down/upside-down classifier;
+- shake/spin/knock classification and false-positive testing;
+- pickup/set-down inference;
 - sustained thermals/performance;
 - Wi-Fi reliability;
 - battery behavior if a battery is fitted;
@@ -147,7 +154,7 @@ Buy/use the target board and validate:
 
 Do not treat voice identity as a hard dependency: recognition failure must downgrade permissions/fall back to touch or phone confirmation rather than making the device unusable.
 
-See `docs/HARDWARE_PLAN.md` and `docs/AUDIO_ROBUSTNESS.md`.
+See `docs/HARDWARE_PLAN.md`, `docs/AUDIO_ROBUSTNESS.md`, and `docs/PHYSICAL_INTERACTIONS.md`.
 
 ### P6 — external knowledge and delegation
 
@@ -180,7 +187,8 @@ These are intentionally not treated as solved yet:
 - retention policy for raw transcripts;
 - how proactive speech should differ by viewer/profile;
 - exact local-network STT/TTS/LLM provider choices for Indonesian;
-- exact offline-capsule storage/index format and removable-media encryption scheme.
+- exact offline-capsule storage/index format and removable-media encryption scheme;
+- calibrated physical-gesture thresholds and whether body-wide capacitive touch is worth extra hardware later.
 
 When one of these becomes a real architectural decision, record it in `docs/DECISIONS.md`.
 
