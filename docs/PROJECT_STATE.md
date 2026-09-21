@@ -35,7 +35,17 @@ Real names, private biography, relationship details, credentials, recordings and
 - provider-neutral person directory and conservative speaker-identity decision service;
 - runtime speaker recognition integration that remains personalization evidence rather than private-memory authorization;
 - file-backed personal memory with validation, subject/viewer access policy, sharing, expiry, bounded recall, edit/delete and fail-closed persistence;
-- content/context filtering tests proving unauthorized personal facts do not reach the model.
+- content/context filtering tests proving unauthorized personal facts do not reach the model;
+- privacy-filtered offline personal-capsule compiler/export with recipient/viewer enforcement;
+- deterministic Open-Meteo weather summaries and scheduled daily briefings;
+- direct DeepSeek/OpenRouter balance/key-limit monitoring without an LLM call;
+- local daily soft budget for provider-reported realtime voice tokens;
+- measured voice latency telemetry with bounded p50/p95 summaries;
+- optional Hermes Runs API delegation for long agent work;
+- allowlisted Telegram bridge with ask/say/notify/status/agent commands;
+- durable per-device remote inbox with TTL, leasing, retry and authenticated device poll/ack;
+- idle remote delivery that keeps queued voice prompts server-side and does not require an always-on realtime model session;
+- bounded authenticated network-diagnostic endpoints shared with firmware.
 
 ### Firmware / Waveshare 1.85B
 
@@ -59,7 +69,13 @@ Real names, private biography, relationship details, credentials, recordings and
 - persistent local timer and daily-alarm state;
 - offline hold-to-show-time and configurable double-tap quick timer behavior;
 - face gaze target API prepared for external local vision;
-- firmware OTA verification including expected SHA-256/size and device credential reuse.
+- firmware OTA verification including expected SHA-256/size and device credential reuse;
+- recipient-safe offline personal-capsule parsing and deterministic local lookup;
+- isolated stroke/pet cycling through offline capsule facts;
+- token-free Nara Says physical minigame using tap/double-tap/hold/stroke/shake;
+- compact local notification/game/network-diagnostic control surface;
+- bounded gateway speed test with ping, download/upload Mbps and MB/s explanation support;
+- battery-aware idle remote-inbox polling and one-shot remote voice wake without microphone streaming.
 
 ### Optional external local vision
 
@@ -109,6 +125,8 @@ The runtime connectivity vocabulary remains:
 - `isolated`.
 
 Phone hotspot is ordinary saved Wi-Fi station connectivity. The firmware can now remain useful/alive when saved Wi-Fi is absent and recover automatically when it returns.
+
+When Internet/gateway access exists but the realtime voice WebSocket is closed, the device can poll a small authenticated remote inbox. The default software cadence is 15 seconds, relaxed to 60 seconds in battery saver and 120 seconds at critical battery. Local notifications do not open AI voice. A queued ask/say request opens a one-shot voice channel without enabling microphone listening, then closes after TTS or a 90-second fail-safe. These intervals are software defaults, not measured battery-life claims.
 
 A browser phone-audio bridge exists for an online/reachable Nara Gateway, but the production **ESP32-created secure SoftAP peer UI** is still a separate staged feature. Do not confuse those two paths.
 
@@ -176,7 +194,7 @@ Already implemented:
 Still staged:
 
 - richer local navigation/status UI around the utility foundation;
-- offline personal capsule compiler/storage/search;
+- local notes/messages/media beyond the implemented authorized capsule;
 - direct secure SoftAP peer UI on the ESP32;
 - local-network STT/LLM/TTS adapters;
 - production DPP / secure provisioning migration.
@@ -222,14 +240,13 @@ Passkey-first account authentication remains the preferred product direction.
 
 ### P2 — isolated-device utility/capsule UX
 
-The RTC/timer/alarm firmware foundation is implemented. Expand the no-network
-product layer with:
+The RTC/timer/alarm foundation and first recipient-safe offline capsule are
+implemented, including bounded parsing, deterministic lookup and local
+stroke/pet browsing. Remaining product-layer work is optional enrichment:
 
-- richer local navigation/status around the implemented clock/timer/alarm;
-- permission-filtered offline personal capsule;
-- deterministic local lookup;
-- local notes/messages/media;
-- reconnect refresh/sync.
+- richer local navigation/status around clock/timer/alarm/capsule;
+- local notes/messages/media beyond the current capsule;
+- explicit reconnect refresh/sync UX.
 
 ### P3 — production commissioning/direct peer
 
@@ -244,15 +261,17 @@ Replace/contain the inherited open provisioning path before private direct-peer 
 
 ### P4 — optional ecosystem expansion
 
-Only after the privacy/physical product path is dependable:
+Hermes Runs API delegation is now implemented as an optional backend and does
+not sit in the realtime voice critical path. Remaining ecosystem expansion is
+non-blocking:
 
-- web/search adapter;
-- optional Hermes delegation;
+- dedicated web/search adapters beyond delegated Hermes research;
 - additional voice providers such as GPT Live/chained local voice;
-- reminders/calendar/home automation;
+- reminders/calendar/home automation connectors;
 - richer local-network STT/LLM/TTS.
 
-These are provider/features backlog, not blockers for validating the first physical Nara.
+These are optional provider/features backlog, not blockers for validating the
+first physical Nara.
 
 ## OTA and assets
 
@@ -289,7 +308,7 @@ Still intentionally open:
 
 - concrete passkey/account service and recovery UX;
 - encryption-at-rest/key ownership for private memory;
-- first production offline-capsule format and removable-media protection;
+- encryption/authenticity policy for private capsule/assets at rest and on removable media;
 - exact local-network Indonesian STT/TTS/LLM stack;
 - final physical gesture thresholds;
 - whether two physical speech microphones plus playback reference should be exposed to the AFE after real capture analysis;
