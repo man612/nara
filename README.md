@@ -37,6 +37,20 @@ The realtime voice path stays thin. Slow web search, browser work, long reasonin
 - Memory: start local; PostgreSQL/pgvector can be added when deployment needs it.
 - Device: first target is Waveshare ESP32-S3-Touch-LCD-1.85B through the standalone `nara-firmware` repository.
 
+## Project continuity
+
+The repository is the durable source of truth for project direction rather than chat history.
+
+Start with:
+
+- `AGENTS.md`
+- `docs/REPO_MAP.md`
+- `docs/PROJECT_STATE.md`
+
+Personal/multi-person memory design lives in `docs/PERSONAL_KNOWLEDGE.md`. Hardware purchase/test state lives in `docs/HARDWARE_PLAN.md`. Durable architectural choices live in `docs/DECISIONS.md`.
+
+Real personal knowledge is runtime-private and must never be committed to this public repository.
+
 ## Deployment
 
 Nara does not assume a permanent host. It can run on a laptop, home server, generic VPS, SumoPod, or another container platform.
@@ -49,5 +63,4 @@ Nara also has a provider-neutral Action Runtime. Gemini Live can receive compact
 
 The standalone firmware also has the portable Nara face engine integrated into the Waveshare runtime.
 
-Next milestones are hardware-in-the-loop voice/action validation, local memory, search, optional Hermes delegation, additional production voice adapters, and later in-session provider recovery where it is technically safe.
-
+The next architectural milestone is a local personal-memory/context vertical slice with multi-person access control, followed by hardware-in-the-loop voice/action validation, search, optional Hermes delegation, additional production voice adapters, and later in-session provider recovery where it is technically safe.
