@@ -267,6 +267,7 @@ Useful findings:
 - ESPHome exposes BLE Improv and captive-portal/fallback-AP patterns, but explicitly warns that BLE memory pressure can collide with heavy voice/audio workloads.
 - ESP-IDF documents that Wi-Fi and BLE share the ESP32-S3 2.4 GHz radio; supported coexistence does not mean simultaneous use is free.
 - Matter uses BLE as a commissioning channel and common esp-matter configurations release BLE resources after commissioning when persistent BLE is not required.
+- Home Assistant Voice Preview Edition's factory firmware is an especially relevant voice-device pattern: it enables BLE on Wi-Fi disconnect, disables BLE after Wi-Fi connects, and waits for BLE to be disabled before the voice-assistant client proceeds.
 - ESP-IDF's SoftAP+Station examples prove the chip can support both roles, but Nara should not keep a peer AP exposed continuously just because APSTA exists.
 
 Decision:
@@ -285,5 +286,6 @@ References:
 - https://esphome.io/components/provisioning/
 - https://esphome.io/components/esp32_improv/
 - https://github.com/esphome/esphome-project-template
+- https://github.com/esphome/home-assistant-voice-pe/blob/dev/home-assistant-voice.factory.yaml
 - https://github.com/project-chip/connectedhomeip
 - https://github.com/espressif/esp-matter
