@@ -128,7 +128,7 @@ export class DeviceRegistry {
   private readonly devices = new Map<string, DeviceRecord>();
   private readonly claims = new Map<string, ClaimRecord>();
   private readonly now: () => number;
-  private readonly filePath?: string;
+  private readonly filePath: string | undefined;
   private writeChain: Promise<void> = Promise.resolve();
 
   private constructor(options: DeviceRegistryOptions = {}) {
