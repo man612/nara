@@ -9,6 +9,7 @@ import type {
   ToolResult
 } from "../actions/contracts.js";
 import type { FirmwareVoiceControl } from "./voice-control.js";
+import type { VoiceLatencySample } from "../telemetry/voice-latency.js";
 import type {
   ProviderUsage,
   VoiceProvider,
@@ -51,6 +52,9 @@ export type FirmwareVoiceBridgeOptions = {
     text: string,
     final: boolean
   ) => void | Promise<void>;
+  onLatencySample?: (
+    sample: VoiceLatencySample
+  ) => void | Promise<void>;
 
   /**
    * Additional server-side tools bound to this authenticated firmware
@@ -86,6 +90,9 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
   private outputActive = false;
   private suppressOutput = false;
   private closed = false;
+  private turnEndAtMs: number | null = null;
+  private providerFirstAudioMs: number | null = null;
+  private latencyReported = false;
 
   constructor(
     private readonly session: FirmwareSessionInfo,
@@ -99,7 +106,10 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     this.pacer = new RealtimePacketPacer({
       intervalMs: transport.playback.frame_duration,
       prebufferPackets: options.prebufferPackets ?? 5,
-      send: (packet) => transport.sendAudio(packet),
+      send: (packet) => {
+        transport.sendAudio(packet);
+        void this.recordFirstPlaybackPacket();
+      },
       onError: (error) => {
         void this.reportError(error);
       }
@@ -147,6 +157,9 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
 
     const state = typeof event.state === "string" ? event.state : "";
     if (state === "start") {
+      this.turnEndAtMs = null;
+      this.providerFirstAudioMs = null;
+      this.latencyReported = false;
       if (this.outputActive) {
         this.suppressOutput = true;
         await this.interruptPlayback();
@@ -156,6 +169,9 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     }
 
     if (state === "stop") {
+      this.turnEndAtMs = performance.now();
+      this.providerFirstAudioMs = null;
+      this.latencyReported = false;
       await this.voice.endAudioStream?.();
     }
   }
@@ -235,6 +251,13 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     switch (event.type) {
       case "audio": {
         if (this.suppressOutput) return;
+        if (
+          this.turnEndAtMs !== null &&
+          this.providerFirstAudioMs === null
+        ) {
+          this.providerFirstAudioMs =
+            performance.now() - this.turnEndAtMs;
+        }
         const packets = await this.codec.encodeDownlink(event.chunk);
         this.enqueuePlayback(packets);
         return;
@@ -379,6 +402,34 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
           : new Error("Tool execution failed")
       );
     }
+  }
+
+  private async recordFirstPlaybackPacket(): Promise<void> {
+    if (
+      this.latencyReported ||
+      this.turnEndAtMs === null ||
+      this.providerFirstAudioMs === null
+    ) {
+      return;
+    }
+
+    this.latencyReported = true;
+    const sample: VoiceLatencySample = {
+      sessionId: this.session.sessionId,
+      ...(this.session.deviceId
+        ? { deviceId: this.session.deviceId }
+        : {}),
+      providerFirstAudioMs: Math.max(
+        0,
+        Math.round(this.providerFirstAudioMs)
+      ),
+      deviceFirstPacketMs: Math.max(
+        0,
+        Math.round(performance.now() - this.turnEndAtMs)
+      ),
+      recordedAt: new Date().toISOString()
+    };
+    await this.options.onLatencySample?.(sample);
   }
 
   private enqueuePlayback(packets: Uint8Array[]): void {
