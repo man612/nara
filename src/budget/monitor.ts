@@ -69,7 +69,7 @@ export class DeepSeekBudgetSource implements ProviderBudgetSource {
       this.options.endpoint ?? "https://api.deepseek.com/user/balance",
       {
         headers: { authorization: "Bearer " + this.apiKey },
-        ...(signal ? { ...(signal ? { signal } : {}) } : {})
+        ...(signal ? { signal } : {})
       }
     );
     if (!response.ok) {
@@ -128,7 +128,7 @@ export class OpenRouterBudgetSource implements ProviderBudgetSource {
       this.options.endpoint ?? "https://openrouter.ai/api/v1/key",
       {
         headers: { authorization: "Bearer " + this.apiKey },
-        ...(signal ? { ...(signal ? { signal } : {}) } : {})
+        ...(signal ? { signal } : {})
       }
     );
     if (!response.ok) {
