@@ -197,7 +197,10 @@ export class GitHubReleaseOtaCatalog implements OtaCatalog {
 
     const response = await this.fetchImpl(
       `https://api.github.com/repos/${this.repository}/releases?per_page=20`,
-      { headers, signal }
+      {
+        headers,
+        ...(signal ? { signal } : {})
+      }
     );
     if (!response.ok) {
       throw new Error(`GitHub releases request failed: ${response.status}`);
@@ -224,7 +227,10 @@ export class GitHubReleaseOtaCatalog implements OtaCatalog {
       return cached.value;
     }
 
-    const response = await this.fetchImpl(url, { signal });
+    const response = await this.fetchImpl(
+      url,
+      signal ? { signal } : undefined
+    );
     if (!response.ok) {
       return undefined;
     }
