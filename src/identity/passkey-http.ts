@@ -206,18 +206,20 @@ export function createPasskeyHttpHandler(options: {
         const body = await readJson(request);
         if (
           typeof body.enrollmentToken !== "string" ||
-          !body.enrollmentToken.trim() ||
-          typeof body.personId !== "string" ||
-          !body.personId.trim()
+          !body.enrollmentToken.trim()
         ) {
           return json(response, 400, {
             ok: false,
-            error: "enrollmentToken and personId are required"
+            error: "enrollmentToken is required"
           });
         }
+        const enrollmentIdentity =
+          options.passkeys.getEnrollmentIdentity(
+            body.enrollmentToken
+          );
         const profile = eligibleProfile(
           options.directory,
-          body.personId
+          enrollmentIdentity.personId
         );
         if (!profile) {
           return json(response, 404, {
@@ -576,9 +578,7 @@ export function createPasskeyHttpHandler(options: {
           const grant = options.viewerGrants.grant(
             device.deviceId,
             viewer,
-            ...(ttlMs !== undefined
-              ? [{ ttlMs }]
-              : [])
+            ttlMs !== undefined ? { ttlMs } : {}
           );
           return json(response, 201, {
             ok: true,
