@@ -70,3 +70,20 @@ This is an architectural concept, not a dependency on Hermes or its file layout.
 Nara stays local-first for its first durable memory implementation, but the exact storage engine is intentionally not locked yet.
 
 A storage implementation may later be replaced by a single-file database, PostgreSQL, or another backend without changing the device protocol or core conversation model.
+
+
+## 2026-09-21 — Offline usefulness is a core product requirement
+
+**Status:** accepted
+
+Loss of Internet connectivity must degrade Nara's capabilities rather than make the device useless.
+
+Consequences:
+
+- connectivity state is separate from interaction state;
+- isolated-device mode keeps local UI, touch/IMU behavior, clock/timer/alarm, diagnostics, and an authorized offline personal capsule;
+- a temporary Wi-Fi failure must not behave like first-time setup forever;
+- full free-form Indonesian conversation is not promised on the ESP32 alone;
+- local-network STT/brain/TTS may be provided by replaceable local services without changing the device protocol;
+- owner-private facts are never copied into a recipient's offline capsule;
+- Bluetooth LE is for control/sync on ESP32-S3, not assumed to be an audio transport.
