@@ -90,7 +90,7 @@ export type PasskeyRegistrationCredential = {
   response: {
     clientDataJSON: string;
     attestationObject: string;
-    transports?: string[];
+    transports?: PasskeyTransport[];
   };
 };
 
