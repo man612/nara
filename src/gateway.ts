@@ -7,6 +7,10 @@ import WebSocket, { WebSocketServer } from "ws";
 import type { RawData } from "ws";
 import type { DeviceCommand, DeviceEvent } from "./contracts/device.js";
 import {
+  bearerTokenFromAuthorization,
+  type DeviceRegistry
+} from "./device/registry.js";
+import {
   createFirmwareServerHello,
   decodeFirmwareAudioFrame,
   encodeFirmwareAudioFrame,
@@ -22,6 +26,8 @@ export type FirmwareSessionInfo = {
   sessionId: string;
   protocolVersion: FirmwareProtocolVersion;
   hello: FirmwareHello;
+  deviceId?: string;
+  clientId?: string;
 };
 
 export type FirmwareSessionTransport = {
@@ -58,6 +64,7 @@ export type GatewayHooks = {
 
 export type GatewayOptions = {
   deviceToken?: string;
+  deviceRegistry?: DeviceRegistry;
   virtualDeviceHtml?: string;
   firmwareSessionFactory?: FirmwareSessionFactory;
   hooks?: GatewayHooks;
@@ -87,6 +94,42 @@ function toBytes(raw: RawData): Uint8Array {
   return raw;
 }
 
+function headerString(
+  value: string | string[] | undefined
+): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+function isGatewayDeviceAuthorized(
+  request: IncomingMessage,
+  options: GatewayOptions
+): boolean {
+  const authorization = request.headers.authorization;
+  const deviceId = headerString(request.headers["device-id"]);
+
+  if (deviceId && options.deviceRegistry) {
+    const state = options.deviceRegistry.getDeviceState(deviceId);
+
+    // Once a device is active, the fleet/bootstrap token must no longer be
+    // able to impersonate it. Revocation must also win over any legacy token.
+    if (state === "revoked") {
+      return false;
+    }
+    if (state === "active") {
+      const credential = bearerTokenFromAuthorization(authorization);
+      return (
+        credential !== undefined &&
+        options.deviceRegistry.verifyDeviceCredential(deviceId, credential)
+      );
+    }
+  }
+
+  // Development/bootstrap compatibility for devices that have not yet moved
+  // to per-device credentials.
+  return isDeviceAuthorized(authorization, options.deviceToken);
+}
+
 export function createGatewayServer(options: GatewayOptions = {}): GatewayServer {
   const virtualDeviceHtml =
     options.virtualDeviceHtml ??
@@ -114,11 +157,13 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
     server,
     path: "/device",
     verifyClient: (info: { req: IncomingMessage }) =>
-      isDeviceAuthorized(info.req.headers.authorization, options.deviceToken)
+      isGatewayDeviceAuthorized(info.req, options)
   });
 
-  wss.on("connection", (socket) => {
+  wss.on("connection", (socket, request) => {
     const sessionId = randomUUID();
+    const deviceId = headerString(request.headers["device-id"]);
+    const clientId = headerString(request.headers["client-id"]);
     let firmwareSession: FirmwareSessionInfo | null = null;
     let firmwareHandler: FirmwareSessionHandler | null = null;
     let firmwareTransport: FirmwareSessionTransport | null = null;
@@ -209,7 +254,9 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
         firmwareSession = {
           sessionId,
           protocolVersion: message.version,
-          hello: message
+          hello: message,
+          ...(deviceId ? { deviceId } : {}),
+          ...(clientId ? { clientId } : {})
         };
 
         const serverHello = createFirmwareServerHello(sessionId);
