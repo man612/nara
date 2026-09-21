@@ -8,6 +8,7 @@ import type { BriefingService } from "../briefing/service.js";
 import type { OpenMeteoWeatherClient } from "../briefing/weather.js";
 import { describeWeatherId } from "../briefing/weather.js";
 import type { ProviderBudgetMonitor } from "../budget/monitor.js";
+import type { DailyTokenBudget } from "../budget/token-ledger.js";
 import type { HermesAgentClient } from "../agents/hermes.js";
 import type { VoiceLatencyMonitor } from "../telemetry/voice-latency.js";
 
@@ -23,6 +24,7 @@ export class CompanionStatusToolProvider implements ToolProvider {
       briefing: BriefingService;
       weather?: OpenMeteoWeatherClient;
       budgets?: ProviderBudgetMonitor;
+      tokenBudget?: DailyTokenBudget;
       latency: VoiceLatencyMonitor;
       hermes?: HermesAgentClient;
       deviceId?: string;
@@ -84,10 +86,12 @@ export class CompanionStatusToolProvider implements ToolProvider {
           if (!this.options.budgets) {
             return this.failure(call, "AI budget monitoring is not configured");
           }
-          return this.success(
-            call,
-            await this.options.budgets.readAll(signal)
-          );
+          return this.success(call, {
+            providers: await this.options.budgets.readAll(signal),
+            ...(this.options.tokenBudget
+              ? { voiceTokens: this.options.tokenBudget.snapshot() }
+              : {})
+          });
         }
         case "latency":
           return this.success(call, {
