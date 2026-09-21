@@ -2,6 +2,7 @@ import type {
   AudioCodecFactory,
   AudioCodecSession
 } from "../audio/codec.js";
+import { ActionRuntime } from "../actions/runtime.js";
 import type {
   ProviderUsage,
   VoiceProvider,
@@ -14,6 +15,7 @@ import type {
   FirmwareSessionTransport
 } from "../gateway.js";
 import { RealtimePacketPacer } from "./audio-pacer.js";
+import { DeviceMcpToolProvider } from "./mcp-tools.js";
 
 export type FirmwareVoiceBridgeOptions = {
   voiceProvider: VoiceProvider;
@@ -40,6 +42,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 class FirmwareVoiceSession implements FirmwareSessionHandler {
   private readonly pacer: RealtimePacketPacer;
   private readonly unsubscribeVoice: () => void;
+  private readonly toolTasks = new Set<Promise<void>>();
   private voiceEventChain: Promise<void> = Promise.resolve();
   private playbackGeneration = 0;
   private outputActive = false;
@@ -51,6 +54,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     private readonly transport: FirmwareSessionTransport,
     private readonly codec: AudioCodecSession,
     private readonly voice: VoiceSession,
+    private readonly actions: ActionRuntime | null,
     private readonly options: FirmwareVoiceBridgeOptions
   ) {
     this.pacer = new RealtimePacketPacer({
@@ -85,6 +89,11 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
 
   async onEvent(event: unknown): Promise<void> {
     if (this.closed || !isRecord(event)) return;
+
+    if (await this.actions?.onEvent(event)) {
+      return;
+    }
+
     const type = typeof event.type === "string" ? event.type : "";
 
     if (type === "abort") {
@@ -98,9 +107,6 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
 
     const state = typeof event.state === "string" ? event.state : "";
     if (state === "start") {
-      // Entering listening while output is active is an explicit local
-      // barge-in. Stop queued playback immediately; provider audio that follows
-      // will be treated as a new response turn.
       if (this.outputActive) {
         this.suppressOutput = true;
         await this.interruptPlayback();
@@ -110,9 +116,6 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     }
 
     if (state === "stop") {
-      // Manual push-to-talk stops the microphone abruptly. Gemini and other
-      // automatic-VAD providers need an explicit stream-end hint so they do not
-      // wait forever for trailing silence.
       await this.voice.endAudioStream?.();
     }
   }
@@ -125,7 +128,13 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     this.unsubscribeVoice();
     this.pacer.close();
 
+    this.actions?.cancel(
+      [...this.toolTasks].map((_task, index) => `session-close-${index}`)
+    );
+    await this.actions?.close();
+
     await this.voiceEventChain.catch(() => undefined);
+    await Promise.allSettled([...this.toolTasks]);
 
     const results = await Promise.allSettled([
       this.codec.close(),
@@ -186,8 +195,18 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
         await this.options.onUsage?.(this.session, event.usage);
         return;
 
-      case "tool.call":
+      case "tool.call": {
         await this.options.onToolCall?.(this.session, event);
+        const task = this.executeTool(event);
+        this.toolTasks.add(task);
+        void task.finally(() => {
+          this.toolTasks.delete(task);
+        });
+        return;
+      }
+
+      case "tool.cancel":
+        this.actions?.cancel(event.callIds);
         return;
 
       case "error":
@@ -199,6 +218,45 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
       case "speech.started":
       case "speech.stopped":
         return;
+    }
+  }
+
+  private async executeTool(
+    event: Extract<VoiceSessionEvent, { type: "tool.call" }>
+  ): Promise<void> {
+    try {
+      const result = this.actions
+        ? await this.actions.execute({
+            name: event.name,
+            arguments: event.arguments,
+            ...(event.callId ? { callId: event.callId } : {})
+          })
+        : {
+            name: event.name,
+            ok: false,
+            ...(event.callId ? { callId: event.callId } : {}),
+            error: "No action runtime is available for this session"
+          };
+
+      if (this.closed) return;
+
+      if (!this.voice.sendToolResult) {
+        await this.reportError(
+          new Error(
+            `Voice provider requested tool ${event.name} but cannot receive tool results`
+          )
+        );
+        return;
+      }
+
+      await this.voice.sendToolResult(result);
+    } catch (error) {
+      if (this.closed) return;
+      await this.reportError(
+        error instanceof Error
+          ? error
+          : new Error("Tool execution failed")
+      );
     }
   }
 
@@ -291,11 +349,23 @@ export class FirmwareVoiceBridge {
       }
     });
 
+    const supportsDeviceMcp = session.hello.features?.mcp === true;
+    const actions = supportsDeviceMcp
+      ? await ActionRuntime.create([
+          new DeviceMcpToolProvider(transport)
+        ])
+      : null;
+
     let voice: VoiceSession;
     try {
-      voice = await this.options.voiceProvider.connect();
+      voice = await this.options.voiceProvider.connect(
+        actions ? { tools: actions.listTools() } : undefined
+      );
     } catch (error) {
-      await codec.close();
+      await Promise.allSettled([
+        codec.close(),
+        actions?.close() ?? Promise.resolve()
+      ]);
       throw error;
     }
 
@@ -304,6 +374,7 @@ export class FirmwareVoiceBridge {
       transport,
       codec,
       voice,
+      actions,
       this.options
     );
   };
