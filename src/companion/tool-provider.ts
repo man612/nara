@@ -83,11 +83,13 @@ export class CompanionStatusToolProvider implements ToolProvider {
           });
         }
         case "ai_budget": {
-          if (!this.options.budgets) {
+          if (!this.options.budgets && !this.options.tokenBudget) {
             return this.failure(call, "AI budget monitoring is not configured");
           }
           return this.success(call, {
-            providers: await this.options.budgets.readAll(signal),
+            providers: this.options.budgets
+              ? await this.options.budgets.readAll(signal)
+              : [],
             ...(this.options.tokenBudget
               ? { voiceTokens: this.options.tokenBudget.snapshot() }
               : {})
