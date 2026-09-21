@@ -43,6 +43,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
   private readonly pacer: RealtimePacketPacer;
   private readonly unsubscribeVoice: () => void;
   private readonly toolTasks = new Set<Promise<void>>();
+  private readonly cancelledToolCalls = new Set<string>();
   private voiceEventChain: Promise<void> = Promise.resolve();
   private playbackGeneration = 0;
   private outputActive = false;
@@ -203,6 +204,9 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
       }
 
       case "tool.cancel":
+        for (const callId of event.callIds) {
+          this.cancelledToolCalls.add(callId);
+        }
         this.actions?.cancel(event.callIds);
         return;
 
@@ -236,6 +240,13 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
           };
 
       if (this.closed) return;
+
+      if (
+        event.callId &&
+        this.cancelledToolCalls.delete(event.callId)
+      ) {
+        return;
+      }
 
       if (!this.voice.sendToolResult) {
         await this.reportError(
