@@ -69,8 +69,14 @@ export interface PhoneSessionHandler {
   close(): void | Promise<void>;
 }
 
+export type PhoneSessionContext = {
+  viewerId?: string;
+  accountId?: string;
+};
+
 export type PhoneSessionFactory = (
-  transport: PhoneSessionTransport
+  transport: PhoneSessionTransport,
+  context: PhoneSessionContext
 ) => Promise<PhoneSessionHandler>;
 
 export type GatewayHooks = {
@@ -99,6 +105,9 @@ export type GatewayOptions = {
   firmwareSessionFactory?: FirmwareSessionFactory;
   phoneSessionFactory?: PhoneSessionFactory;
   phoneToken?: string;
+  resolvePhoneViewerSession?: (
+    sessionToken: string
+  ) => PhoneSessionContext | undefined;
   phoneBridgeHtml?: string;
   httpHandlers?: GatewayHttpHandler[];
   hooks?: GatewayHooks;
@@ -141,8 +150,25 @@ function secureEqualText(left: string, right: string): boolean {
   return a.byteLength === b.byteLength && timingSafeEqual(a, b);
 }
 
+function websocketProtocols(request: IncomingMessage): string[] {
+  const header = headerString(request.headers["sec-websocket-protocol"]);
+  if (!header) return [];
+  return header
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 function expectedPhoneProtocol(token: string): string {
   return `auth.${Buffer.from(token, "utf8").toString("base64url")}`;
+}
+
+function phoneViewerSessionToken(request: IncomingMessage): string | undefined {
+  const protocol = websocketProtocols(request).find((value) =>
+    value.startsWith("viewer.")
+  );
+  const token = protocol?.slice("viewer.".length);
+  return token || undefined;
 }
 
 export function isGatewayPhoneAuthorized(
@@ -150,12 +176,7 @@ export function isGatewayPhoneAuthorized(
   phoneToken?: string
 ): boolean {
   if (!phoneToken) return false;
-  const header = headerString(request.headers["sec-websocket-protocol"]);
-  if (!header) return false;
-  const protocols = header
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const protocols = websocketProtocols(request);
   return (
     protocols.includes("nara-phone-v1") &&
     protocols.some((value) => secureEqualText(value, expectedPhoneProtocol(phoneToken)))
@@ -265,6 +286,11 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
     const clientId = headerString(request.headers["client-id"]);
     const deviceAuthorized = isGatewayDeviceAuthorized(request, options);
     const phoneAuthorized = isGatewayPhoneAuthorized(request, options.phoneToken);
+    const viewerSessionToken = phoneViewerSessionToken(request);
+    const phoneViewer =
+      viewerSessionToken && options.resolvePhoneViewerSession
+        ? options.resolvePhoneViewerSession(viewerSessionToken)
+        : undefined;
     let firmwareSession: FirmwareSessionInfo | null = null;
     let phoneSession = false;
     let phoneHandler: PhoneSessionHandler | null = null;
@@ -397,7 +423,10 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
         phoneSession = true;
         const transport = createPhoneTransport();
         try {
-          phoneHandler = await options.phoneSessionFactory(transport);
+          phoneHandler = await options.phoneSessionFactory(
+            transport,
+            phoneViewer ?? {}
+          );
           socket.send(JSON.stringify({
             type: "phone.ready",
             version: 1,
