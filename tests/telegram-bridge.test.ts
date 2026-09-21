@@ -166,8 +166,9 @@ describe("TelegramBridge", () => {
 
     await bridge.pollOnce();
     expect(executeTool).toHaveBeenCalledWith({
-      name: "device_notify",
+      name: "device_companion",
       arguments: {
+        op: "notify",
         text: "jangan lupa makan",
         emotion: "happy",
         sound: "builtin:popup"
