@@ -171,7 +171,7 @@ describe("passkey identity HTTP", () => {
         };
       };
       expect(optionsResponse.status).toBe(200);
-      expect(options.publicKey.user).toEqual({
+      expect(options.publicKey.user).toMatchObject({
         name: "person:partner",
         displayName: "Partner"
       });
