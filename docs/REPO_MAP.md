@@ -12,6 +12,7 @@ Read this before broad code search.
 - `docs/ONBOARDING_IDENTITY.md` — research-backed proposal for first-use gift claiming, account/device identity, secure pairing, Wi-Fi provisioning, voice identity, recovery, and transfer.
 - `docs/AUDIO_ROBUSTNESS.md` — hardware/audio audit, fail-soft voice identity, fallback UX, diagnostics, and hardware-in-the-loop test plan.
 - `docs/OFFLINE_RUNTIME.md` — offline capability levels, isolated-device utilities, local personal capsule, local-network voice, reconnect, and security strategy.
+- `docs/PHYSICAL_INTERACTIONS.md` — CST816S/QMI8658 capabilities, local reflex architecture, gesture classifiers, reaction policy, and hardware validation.
 - `docs/RESEARCH_SOURCES.md` — external projects evaluated, useful ideas, licenses, and decisions.
 
 ## Runtime entry
@@ -77,6 +78,7 @@ The current file adapter is a replaceable first implementation, not permission t
 - `docs/ONBOARDING_IDENTITY.md` — device claim, human authentication, provisioning, speaker identity, and lifecycle design.
 - `docs/AUDIO_ROBUSTNESS.md` — mic/speaker/AEC robustness, voice identity fallback, diagnostics, and HIL audio validation.
 - `docs/OFFLINE_RUNTIME.md` — offline-first behavior, local capsule, peer mode, local voice provider path, and reconnect rules.
+- `docs/PHYSICAL_INTERACTIONS.md` — touch/motion reflexes, petting/shake/upside-down behavior, classifier boundaries, and local personality rules.
 
 ## Tests
 

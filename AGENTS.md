@@ -38,6 +38,8 @@ Do not spend agent context rediscovering decisions recorded in `docs/`. Do not r
 - Device messages must be versioned and hardware-neutral.
 - Hardware-specific behavior belongs in firmware, not this repo.
 - Blink, gaze, lip-sync, idle animation, touch, and IMU reactions should be deterministic local behaviors where possible.
+- Physical touch/motion reactions are local-first reflexes; do not send raw high-rate IMU/touch streams to an LLM or cloud by default. Read `docs/PHYSICAL_INTERACTIONS.md` before changing sensor behavior.
+- Treat physical gestures as episodes with hysteresis/cooldowns so noisy samples do not repeatedly trigger speech or animation.
 - Normalize provider usage before cost accounting; do not bake volatile prices into adapters.
 - Keep stable prompt prefixes stable so provider caching can work.
 - Do not send large memory/search/tool dumps to a model when a small structured subset is enough.

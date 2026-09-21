@@ -209,3 +209,36 @@ References:
 - https://github.com/OHF-Voice/piper1-gpl
 - https://k2-fsa.github.io/sherpa/onnx/
 - https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/nvs_encryption.html
+
+
+## Physical companion interactions
+
+Purpose: determine which pet-like physical interactions the first Waveshare body can actually support.
+
+Hardware findings:
+
+- Waveshare documents the 1.85B with QMI8658 six-axis IMU and CST816S capacitive touch.
+- QMI8658 supports raw acceleration/gyro plus tap, any-motion, no-motion, significant-motion and wake-on-motion functions in the sensor family.
+- CST816S implementations expose single-finger coordinates and gesture IDs including swipe, single click, double click and long press.
+- the 1.85B quick reference lists the touchscreen interrupt GPIO but only I2C lines for QMI8658, so hardware wake-on-motion interrupt must not be assumed until schematic/hardware verification.
+- the board has no motor/servo/vibration actuator, so physical responses are visual/audio unless extra hardware is added.
+
+Industry pattern:
+
+- LivingAI documents EMO interactions including pickup, petting, shaking and laying down.
+- LivingAI support documents AIBI interactions including petting, shaking, tap, double click/teasing and upside down.
+- Loona publishes touch, 3-axis accelerometer and 3-axis gyroscope among its companion sensors.
+
+Decision:
+
+Use the same broad interaction pattern without copying product behavior: sensor event -> immediate local reflex -> personality variation -> optional AI speech. Touch/motion must remain useful offline and raw high-rate telemetry stays local by default.
+
+References:
+
+- https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.85B
+- https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.85B/ESP-IDF
+- https://files.waveshare.com/upload/5/5f/QMI8658A_Datasheet_Rev_A.pdf
+- https://github.com/fbiego/CST816S
+- https://living.ai/docs/emo/interaction/physical/
+- https://living.ai/support/
+- https://keyirobot.com/products/petbot
