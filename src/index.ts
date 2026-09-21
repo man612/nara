@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createLibopusWasmCodecFactory } from "./audio/libopus-wasm.js";
 import { loadProvidersConfig } from "./config/providers.js";
 import { createPersonalContentHttpHandler } from "./content/http.js";
+import { CompanionRuntime } from "./companion/runtime.js";
 import { PersonalContentService } from "./content/personal-content.js";
 import { DeviceRegistry } from "./device/registry.js";
 import { FirmwareVoiceBridge } from "./device/voice-bridge.js";
@@ -50,9 +51,10 @@ function requiredNumber(name: string): number {
 }
 
 async function createFirmwareVoiceFactory(
-  voiceMemory?: VoiceMemoryRuntime,
-  speakerRuntime?: SpeakerRuntime,
-  mediaTools?: MediaToolProvider
+  voiceMemory: VoiceMemoryRuntime | undefined,
+  speakerRuntime: SpeakerRuntime | undefined,
+  mediaTools: MediaToolProvider | undefined,
+  companion: CompanionRuntime
 ): Promise<FirmwareSessionFactory | undefined> {
   const providersFile = process.env.PROVIDERS_FILE;
   if (!providersFile) {
@@ -92,24 +94,32 @@ async function createFirmwareVoiceFactory(
           }
         }
       : {}),
-    ...(voiceMemory || mediaTools
-      ? {
-          createToolProviders: () => [
-            ...(voiceMemory
-              ? [
-                  // Device authentication proves which Nara body connected,
-                  // not who is currently speaking. Realtime personal recall
-                  // therefore remains guest/public-scoped for now.
-                  new PersonalMemoryToolProvider(voiceMemory.store, {
-                    viewerId: "person:guest",
-                    subjectId: voiceMemory.subjectId
-                  })
-                ]
-              : []),
-            ...(mediaTools ? [mediaTools] : [])
+    createToolProviders: (session) => [
+      ...(voiceMemory
+        ? [
+            // Device authentication proves which Nara body connected,
+            // not who is currently speaking. Realtime personal recall
+            // therefore remains guest/public-scoped for now.
+            new PersonalMemoryToolProvider(voiceMemory.store, {
+              viewerId: "person:guest",
+              subjectId: voiceMemory.subjectId
+            })
           ]
-        }
-      : {})
+        : []),
+      ...(mediaTools ? [mediaTools] : []),
+      ...companion.toolProviders(session.deviceId)
+    ],
+    onControlReady: (session, control) => {
+      companion.registerVoiceControl(session, control);
+    },
+    onControlClosed: (session) => {
+      companion.unregisterVoiceControl(session);
+    },
+    onOutputTranscript: (_session, text, final) =>
+      companion.handleOutputTranscript(text, final),
+    onLatencySample: (sample) => {
+      companion.recordLatency(sample);
+    }
   });
 
   console.log(
@@ -119,8 +129,9 @@ async function createFirmwareVoiceFactory(
 }
 
 async function createPhoneVoiceFactory(
-  voiceMemory?: VoiceMemoryRuntime,
-  mediaTools?: MediaToolProvider
+  voiceMemory: VoiceMemoryRuntime | undefined,
+  mediaTools: MediaToolProvider | undefined,
+  companion: CompanionRuntime
 ): Promise<PhoneSessionFactory | undefined> {
   const providersFile = process.env.PROVIDERS_FILE;
   if (!providersFile) return undefined;
@@ -129,24 +140,21 @@ async function createPhoneVoiceFactory(
   const voiceProvider = createVoiceChain(providersConfig);
   const bridge = new PhoneVoiceBridge({
     voiceProvider,
-    ...(voiceMemory || mediaTools
-      ? {
-          createToolProviders: (context) => [
-            ...(voiceMemory
-              ? [
-                  // The transport token and the human viewer credential are
-                  // separate. Without an authenticated viewer session, phone
-                  // voice remains guest/public just like physical firmware.
-                  new PersonalMemoryToolProvider(voiceMemory.store, {
-                    viewerId: context.viewerId ?? "person:guest",
-                    subjectId: voiceMemory.subjectId
-                  })
-                ]
-              : []),
-            ...(mediaTools ? [mediaTools] : [])
+    createToolProviders: (context) => [
+      ...(voiceMemory
+        ? [
+            // The transport token and the human viewer credential are
+            // separate. Without an authenticated viewer session, phone
+            // voice remains guest/public just like physical firmware.
+            new PersonalMemoryToolProvider(voiceMemory.store, {
+              viewerId: context.viewerId ?? "person:guest",
+              subjectId: voiceMemory.subjectId
+            })
           ]
-        }
-      : {}),
+        : []),
+      ...(mediaTools ? [mediaTools] : []),
+      ...companion.toolProviders()
+    ],
     onUsage: (usage) => {
       console.log(
         `[phone] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`
@@ -258,14 +266,17 @@ async function main(): Promise<void> {
       ? await HumanCredentialRegistry.open({ filePath: humanRegistryFile })
       : undefined;
 
+  const companion = CompanionRuntime.fromEnvironment();
+
   const firmwareSessionFactory = await createFirmwareVoiceFactory(
     voiceMemory,
     speakerRuntime,
-    mediaTools
+    mediaTools,
+    companion
   );
   const phoneToken = process.env.NARA_PHONE_BRIDGE_TOKEN;
   const phoneSessionFactory = phoneToken
-    ? await createPhoneVoiceFactory(voiceMemory, mediaTools)
+    ? await createPhoneVoiceFactory(voiceMemory, mediaTools, companion)
     : undefined;
 
   const contentToken = process.env.NARA_CONTENT_ADMIN_TOKEN;
@@ -327,6 +338,14 @@ async function main(): Promise<void> {
   }
 
   const httpHandlers: NonNullable<GatewayOptions["httpHandlers"]> = [];
+  httpHandlers.push(
+    companion.networkDiagnosticsHandler((request) =>
+      isGatewayDeviceAuthorized(request, {
+        ...(deviceToken ? { deviceToken } : {}),
+        deviceRegistry
+      })
+    )
+  );
   if (
     capsuleToken &&
     capsuleRecipientId &&
@@ -463,6 +482,10 @@ async function main(): Promise<void> {
     if (otaRepository) {
       console.log(`OTA catalog:       GitHub releases ${otaRepository}`);
     }
+    for (const row of companion.describeConfiguration()) {
+      console.log(row);
+    }
+    companion.start();
 
     if (!deviceToken) {
       console.warn(

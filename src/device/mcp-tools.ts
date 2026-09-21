@@ -7,7 +7,7 @@ import type {
 import type { FirmwareSessionTransport } from "../gateway.js";
 
 const MCP_PROTOCOL_VERSION = "2024-11-05";
-const REQUEST_TIMEOUT_MS = 5000;
+const REQUEST_TIMEOUT_MS = 15000;
 const MAX_TOOL_LIST_PAGES = 8;
 
 type PendingRequest = {
@@ -157,6 +157,111 @@ const deviceToolSpecs: DeviceToolSpec[] = [
           throw new Error("preview must be boolean");
         }
         result.preview = argumentsValue.preview;
+      }
+      return result;
+    }
+  },
+  {
+    name: "device_companion",
+    mcpName: "self.companion.control",
+    description:
+      "Use compact local companion features: show a device notification, run a lightweight network diagnostic, or start/stop/read the offline Nara Says minigame.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        op: {
+          type: "string",
+          enum: [
+            "notify",
+            "network_test",
+            "game_start",
+            "game_stop",
+            "game_status"
+          ]
+        },
+        text: {
+          type: "string",
+          minLength: 1,
+          maxLength: 220
+        },
+        emotion: {
+          type: "string",
+          enum: ["neutral", "happy", "shy", "sad", "annoyed", "surprised"]
+        },
+        sound: {
+          type: "string",
+          maxLength: 110
+        },
+        rounds: {
+          type: "integer",
+          minimum: 1,
+          maximum: 12
+        }
+      },
+      required: ["op"],
+      additionalProperties: false
+    },
+    effect: "write",
+    validate(argumentsValue) {
+      if (!isRecord(argumentsValue)) {
+        throw new Error("device_companion requires an object");
+      }
+      const op = argumentsValue.op;
+      const operations = [
+        "notify",
+        "network_test",
+        "game_start",
+        "game_stop",
+        "game_status"
+      ] as const;
+      if (
+        typeof op !== "string" ||
+        !operations.includes(op as (typeof operations)[number])
+      ) {
+        throw new Error("invalid device companion operation");
+      }
+
+      const result: Record<string, unknown> = { op };
+      if (op === "notify") {
+        if (
+          typeof argumentsValue.text !== "string" ||
+          argumentsValue.text.trim().length === 0 ||
+          argumentsValue.text.length > 220
+        ) {
+          throw new Error("text is required for notify and must be at most 220 characters");
+        }
+        result.text = argumentsValue.text.trim();
+        if (argumentsValue.emotion !== undefined) {
+          if (
+            typeof argumentsValue.emotion !== "string" ||
+            !["neutral", "happy", "shy", "sad", "annoyed", "surprised"].includes(
+              argumentsValue.emotion
+            )
+          ) {
+            throw new Error("invalid notification emotion");
+          }
+          result.emotion = argumentsValue.emotion;
+        }
+        if (argumentsValue.sound !== undefined) {
+          if (
+            typeof argumentsValue.sound !== "string" ||
+            argumentsValue.sound.length > 110
+          ) {
+            throw new Error("notification sound must be at most 110 characters");
+          }
+          result.sound = argumentsValue.sound;
+        }
+      } else if (op === "game_start") {
+        const rounds = argumentsValue.rounds ?? 5;
+        if (
+          typeof rounds !== "number" ||
+          !Number.isInteger(rounds) ||
+          rounds < 1 ||
+          rounds > 12
+        ) {
+          throw new Error("rounds must be an integer from 1 to 12");
+        }
+        result.rounds = rounds;
       }
       return result;
     }

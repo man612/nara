@@ -3,7 +3,13 @@ import type {
   AudioCodecSession
 } from "../audio/codec.js";
 import { ActionRuntime } from "../actions/runtime.js";
-import type { ToolProvider } from "../actions/contracts.js";
+import type {
+  ToolCall,
+  ToolProvider,
+  ToolResult
+} from "../actions/contracts.js";
+import type { FirmwareVoiceControl } from "./voice-control.js";
+import type { VoiceLatencySample } from "../telemetry/voice-latency.js";
 import type {
   ProviderUsage,
   VoiceProvider,
@@ -35,6 +41,19 @@ export type FirmwareVoiceBridgeOptions = {
   onError?: (
     session: FirmwareSessionInfo,
     error: Error
+  ) => void | Promise<void>;
+  onControlReady?: (
+    session: FirmwareSessionInfo,
+    control: FirmwareVoiceControl
+  ) => void;
+  onControlClosed?: (session: FirmwareSessionInfo) => void;
+  onOutputTranscript?: (
+    session: FirmwareSessionInfo,
+    text: string,
+    final: boolean
+  ) => void | Promise<void>;
+  onLatencySample?: (
+    sample: VoiceLatencySample
   ) => void | Promise<void>;
 
   /**
@@ -71,6 +90,9 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
   private outputActive = false;
   private suppressOutput = false;
   private closed = false;
+  private turnEndAtMs: number | null = null;
+  private providerFirstAudioMs: number | null = null;
+  private latencyReported = false;
 
   constructor(
     private readonly session: FirmwareSessionInfo,
@@ -84,7 +106,10 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     this.pacer = new RealtimePacketPacer({
       intervalMs: transport.playback.frame_duration,
       prebufferPackets: options.prebufferPackets ?? 5,
-      send: (packet) => transport.sendAudio(packet),
+      send: (packet) => {
+        transport.sendAudio(packet);
+        void this.recordFirstPlaybackPacket();
+      },
       onError: (error) => {
         void this.reportError(error);
       }
@@ -132,6 +157,9 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
 
     const state = typeof event.state === "string" ? event.state : "";
     if (state === "start") {
+      this.turnEndAtMs = null;
+      this.providerFirstAudioMs = null;
+      this.latencyReported = false;
       if (this.outputActive) {
         this.suppressOutput = true;
         await this.interruptPlayback();
@@ -141,6 +169,9 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     }
 
     if (state === "stop") {
+      this.turnEndAtMs = performance.now();
+      this.providerFirstAudioMs = null;
+      this.latencyReported = false;
       await this.voice.endAudioStream?.();
     }
   }
@@ -164,6 +195,8 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
       this.voice.close()
     ]);
 
+    this.options.onControlClosed?.(this.session);
+
     for (const result of results) {
       if (result.status === "rejected") {
         await this.reportError(
@@ -175,12 +208,56 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     }
   }
 
+  async sendText(text: string): Promise<void> {
+    if (this.closed) {
+      throw new Error("Firmware voice session is closed");
+    }
+    if (!this.voice.sendText) {
+      throw new Error("Current voice provider does not support text injection");
+    }
+    await this.voice.sendText(text);
+  }
+
+  async executeTool(call: ToolCall): Promise<ToolResult> {
+    if (this.closed) {
+      return {
+        name: call.name,
+        ok: false,
+        ...(call.callId ? { callId: call.callId } : {}),
+        error: "Firmware voice session is closed"
+      };
+    }
+    if (!this.actions) {
+      return {
+        name: call.name,
+        ok: false,
+        ...(call.callId ? { callId: call.callId } : {}),
+        error: "No action runtime is available for this session"
+      };
+    }
+    return this.actions.execute(call);
+  }
+
+  async interrupt(): Promise<void> {
+    if (this.closed) return;
+    this.suppressOutput = true;
+    await this.interruptPlayback();
+    await this.voice.interrupt();
+  }
+
   private async handleVoiceEvent(event: VoiceSessionEvent): Promise<void> {
     if (this.closed) return;
 
     switch (event.type) {
       case "audio": {
         if (this.suppressOutput) return;
+        if (
+          this.turnEndAtMs !== null &&
+          this.providerFirstAudioMs === null
+        ) {
+          this.providerFirstAudioMs =
+            performance.now() - this.turnEndAtMs;
+        }
         const packets = await this.codec.encodeDownlink(event.chunk);
         this.enqueuePlayback(packets);
         return;
@@ -220,7 +297,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
 
       case "tool.call": {
         await this.options.onToolCall?.(this.session, event);
-        const task = this.executeTool(event);
+        const task = this.executeVoiceTool(event);
         this.toolTasks.add(task);
         void task.finally(() => {
           this.toolTasks.delete(task);
@@ -253,8 +330,15 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
         return;
       }
 
-      case "output.started":
       case "output.transcript":
+        await this.options.onOutputTranscript?.(
+          this.session,
+          event.text,
+          event.final
+        );
+        return;
+
+      case "output.started":
         return;
     }
   }
@@ -274,7 +358,7 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
     }
   }
 
-  private async executeTool(
+  private async executeVoiceTool(
     event: Extract<VoiceSessionEvent, { type: "tool.call" }>
   ): Promise<void> {
     try {
@@ -318,6 +402,34 @@ class FirmwareVoiceSession implements FirmwareSessionHandler {
           : new Error("Tool execution failed")
       );
     }
+  }
+
+  private async recordFirstPlaybackPacket(): Promise<void> {
+    if (
+      this.latencyReported ||
+      this.turnEndAtMs === null ||
+      this.providerFirstAudioMs === null
+    ) {
+      return;
+    }
+
+    this.latencyReported = true;
+    const sample: VoiceLatencySample = {
+      sessionId: this.session.sessionId,
+      ...(this.session.deviceId
+        ? { deviceId: this.session.deviceId }
+        : {}),
+      providerFirstAudioMs: Math.max(
+        0,
+        Math.round(this.providerFirstAudioMs)
+      ),
+      deviceFirstPacketMs: Math.max(
+        0,
+        Math.round(performance.now() - this.turnEndAtMs)
+      ),
+      recordedAt: new Date().toISOString()
+    };
+    await this.options.onLatencySample?.(sample);
   }
 
   private enqueuePlayback(packets: Uint8Array[]): void {
@@ -442,7 +554,7 @@ export class FirmwareVoiceBridge {
     const speakerRecognizer =
       this.options.createSpeakerRecognizer?.(session);
 
-    return new FirmwareVoiceSession(
+    const handler = new FirmwareVoiceSession(
       session,
       transport,
       codec,
@@ -451,5 +563,7 @@ export class FirmwareVoiceBridge {
       speakerRecognizer,
       this.options
     );
+    this.options.onControlReady?.(session, handler);
+    return handler;
   };
 }
