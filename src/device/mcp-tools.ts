@@ -80,13 +80,13 @@ const deviceToolSpecs: DeviceToolSpec[] = [
     name: "device_set_reflex",
     mcpName: "self.reflex.configure",
     description:
-      "Change a local flip, shake, or spin reaction only when the user explicitly asks to customize it.",
+      "Change a local flip, shake, spin, tap, double-tap, hold, or stroke/pet reaction only when the user explicitly asks to customize it.",
     inputSchema: {
       type: "object",
       properties: {
         gesture: {
           type: "string",
-          enum: ["flip", "shake", "spin"]
+          enum: ["flip", "shake", "spin", "tap", "double_tap", "hold", "stroke", "pet"]
         },
         enabled: { type: "boolean" },
         emotion: {
@@ -112,9 +112,11 @@ const deviceToolSpecs: DeviceToolSpec[] = [
       const gesture = argumentsValue.gesture;
       if (
         typeof gesture !== "string" ||
-        !["flip", "shake", "spin"].includes(gesture)
+        !["flip", "shake", "spin", "tap", "double_tap", "hold", "stroke", "pet"].includes(gesture)
       ) {
-        throw new Error("gesture must be flip, shake, or spin");
+        throw new Error(
+          "gesture must be flip, shake, spin, tap, double_tap, hold, stroke, or pet"
+        );
       }
 
       const result: Record<string, unknown> = { gesture };
@@ -156,6 +158,118 @@ const deviceToolSpecs: DeviceToolSpec[] = [
         }
         result.preview = argumentsValue.preview;
       }
+      return result;
+    }
+  },
+  {
+    name: "device_offline_utility",
+    mcpName: "self.offline.utility",
+    description:
+      "Configure RTC-backed local utilities that continue working without Internet: timer, daily alarm, timezone, status, or show time.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: [
+            "timer",
+            "cancel_timer",
+            "alarm",
+            "cancel_alarm",
+            "timezone",
+            "status",
+            "show_time"
+          ]
+        },
+        seconds: {
+          type: "integer",
+          minimum: 1,
+          maximum: 86400
+        },
+        hour: {
+          type: "integer",
+          minimum: 0,
+          maximum: 23
+        },
+        minute: {
+          type: "integer",
+          minimum: 0,
+          maximum: 59
+        },
+        timezone_offset_minutes: {
+          type: "integer",
+          minimum: -720,
+          maximum: 840
+        }
+      },
+      required: ["action"],
+      additionalProperties: false
+    },
+    effect: "write",
+    validate(argumentsValue) {
+      if (!isRecord(argumentsValue)) {
+        throw new Error("device_offline_utility requires an object");
+      }
+
+      const action = argumentsValue.action;
+      const actions = [
+        "timer",
+        "cancel_timer",
+        "alarm",
+        "cancel_alarm",
+        "timezone",
+        "status",
+        "show_time"
+      ] as const;
+      if (
+        typeof action !== "string" ||
+        !actions.includes(action as (typeof actions)[number])
+      ) {
+        throw new Error("invalid offline utility action");
+      }
+
+      const result: Record<string, unknown> = { action };
+      const integerInRange = (
+        name: string,
+        value: unknown,
+        min: number,
+        max: number
+      ): number => {
+        if (
+          typeof value !== "number" ||
+          !Number.isInteger(value) ||
+          value < min ||
+          value > max
+        ) {
+          throw new Error(`${name} must be an integer from ${min} to ${max}`);
+        }
+        return value;
+      };
+
+      if (action === "timer") {
+        result.seconds = integerInRange(
+          "seconds",
+          argumentsValue.seconds,
+          1,
+          86400
+        );
+      } else if (action === "alarm") {
+        result.hour = integerInRange("hour", argumentsValue.hour, 0, 23);
+        result.minute = integerInRange(
+          "minute",
+          argumentsValue.minute,
+          0,
+          59
+        );
+      } else if (action === "timezone") {
+        result.timezone_offset_minutes = integerInRange(
+          "timezone_offset_minutes",
+          argumentsValue.timezone_offset_minutes,
+          -720,
+          840
+        );
+      }
+
       return result;
     }
   }
