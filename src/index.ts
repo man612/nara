@@ -20,6 +20,7 @@ import { GitHubReleaseOtaCatalog } from "./ota/catalog.js";
 import { DeviceUpdateChannels } from "./ota/channels.js";
 import { createOtaHttpHandler } from "./ota/http.js";
 import { PhoneVoiceBridge } from "./phone/voice-bridge.js";
+import { createOfflineCapsuleHttpHandler } from "./offline/capsule-http.js";
 import {
   createGatewayServer,
   isGatewayDeviceAuthorized,
@@ -303,7 +304,44 @@ async function main(): Promise<void> {
     );
   }
 
+  const capsuleToken = process.env.NARA_OFFLINE_CAPSULE_ADMIN_TOKEN;
+  const capsuleRecipientId = process.env.NARA_OFFLINE_CAPSULE_RECIPIENT_ID;
+  const capsuleSubjectId = process.env.NARA_OFFLINE_CAPSULE_SUBJECT_ID;
+  const capsuleConfigPresent =
+    capsuleToken !== undefined ||
+    capsuleRecipientId !== undefined ||
+    capsuleSubjectId !== undefined;
+
+  if (
+    capsuleConfigPresent &&
+    (!capsuleToken ||
+      !capsuleRecipientId ||
+      !capsuleSubjectId ||
+      !personalMemoryStore)
+  ) {
+    throw new Error(
+      "Offline capsule export requires NARA_OFFLINE_CAPSULE_ADMIN_TOKEN, " +
+        "NARA_OFFLINE_CAPSULE_RECIPIENT_ID, NARA_OFFLINE_CAPSULE_SUBJECT_ID, " +
+        "and NARA_PERSONAL_MEMORY_FILE"
+    );
+  }
+
   const httpHandlers: NonNullable<GatewayOptions["httpHandlers"]> = [];
+  if (
+    capsuleToken &&
+    capsuleRecipientId &&
+    capsuleSubjectId &&
+    personalMemoryStore
+  ) {
+    httpHandlers.push(
+      createOfflineCapsuleHttpHandler({
+        store: personalMemoryStore,
+        bearerToken: capsuleToken,
+        recipientPersonId: capsuleRecipientId,
+        subjectPersonId: capsuleSubjectId
+      })
+    );
+  }
   if (humanRegistry && humanAdminToken && personDirectory) {
     httpHandlers.push(
       createHumanAuthHttpHandler({
@@ -411,6 +449,11 @@ async function main(): Promise<void> {
     }
     if (mediaTools) {
       console.log("Media control:     Spotify Web API enabled");
+    }
+    if (capsuleToken && capsuleRecipientId && capsuleSubjectId) {
+      console.log(
+        `Offline capsule:   subject=${capsuleSubjectId} recipient=${capsuleRecipientId}`
+      );
     }
     if (contentToken && contentSubjectId) {
       console.log(
