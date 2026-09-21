@@ -51,7 +51,7 @@ function requiredNumber(name: string): number {
 }
 
 async function createFirmwareVoiceFactory(
-  voiceMemory?: VoiceMemoryRuntime,
+  voiceMemory: VoiceMemoryRuntime | undefined,
   speakerRuntime: SpeakerRuntime | undefined,
   mediaTools: MediaToolProvider | undefined,
   companion: CompanionRuntime
