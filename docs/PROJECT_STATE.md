@@ -31,6 +31,8 @@ Server/runtime:
 - automated unit/integration coverage including a real-Opus firmware voice vertical slice;
 - typed connectivity capability contract separating cloud gateway, local gateway, direct peer and isolated modes;
 - persistent device lifecycle/claim registry with one-time device-bound claims, account + physical approval gates, hashed per-device credentials, rotation/revocation and gateway enforcement;
+- provider-neutral multi-person directory with exactly one primary person, up to six enrolled speaker profiles, and guest fallback;
+- conservative speaker-identity service contract that requires calibrated confidence + margin thresholds and never defaults an ambiguous voice to the primary person;
 - first file-backed personal-memory store with subject/viewer-aware recall, explicit sharing, expiry, edit/delete, bounded retrieval, and persistence tests.
 
 Firmware:
@@ -204,11 +206,26 @@ After memory/context is trustworthy:
 
 ### P7 — multi-person experience
 
-- multiple known people;
-- trusted/guest roles;
-- per-person preferences and memories;
-- sharing policies;
-- optional identity/pairing methods;
+Status: person-directory and speaker-identity decision foundation implemented; real provider adapter/enrollment and session integration remain.
+
+Implemented:
+
+- exactly one primary person per device/profile directory;
+- explicit creator/household/trusted/guest roles;
+- up to six enabled enrolled voice profiles, with unlimited unknown people falling back to guest;
+- provider-neutral speaker recognition contract;
+- confidence + runner-up margin gates so ambiguous audio becomes unknown instead of being forced to the primary person;
+- minimum-audio gate so very short utterances do not waste recognition compute;
+- speaker recognition remains personalization evidence only and does not elevate private-memory authorization.
+
+Still required:
+
+- benchmark real speaker providers on Waveshare microphone audio (3D-Speaker/SpeechBrain/Picovoice candidates);
+- implement enrollment/re-enrollment/delete lifecycle;
+- bind low-risk personalization to recognized speaker;
+- bind strong phone/account/physical authentication separately for private-memory privilege;
+- add per-person preferences and proactive behavior;
+- validate household cross-talk, TV/replay audio, noisy rooms and false accept/reject behavior;
 - multiple devices/profiles without cloning the core runtime.
 
 ## Known connectivity security blocker
