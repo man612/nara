@@ -30,6 +30,7 @@ Server/runtime:
 - normalized provider usage fields for token/cost accounting;
 - automated unit/integration coverage including a real-Opus firmware voice vertical slice;
 - typed connectivity capability contract separating cloud gateway, local gateway, direct peer and isolated modes;
+- persistent device lifecycle/claim registry with one-time device-bound claims, account + physical approval gates, hashed per-device credentials, rotation/revocation and gateway enforcement;
 - first file-backed personal-memory store with subject/viewer-aware recall, explicit sharing, expiry, edit/delete, bounded retrieval, and persistence tests.
 
 Firmware:
@@ -92,6 +93,18 @@ First end-to-end scenario remains:
 > A trusted partner asks Nara a question about the owner. Nara retrieves only owner facts explicitly shareable with that partner and answers from those facts.
 
 ### P2 — identity and context composer
+
+Status: device identity/credential foundation implemented; human account authentication, viewer resolution and context composition remain.
+
+Implemented identity foundation:
+
+- persistent runtime-private device registry;
+- `unclaimed -> claim_pending -> active/revoked` lifecycle;
+- one-time expiring claim transaction;
+- separate account approval and physical approval gates;
+- per-device credential issuance, hashing, rotation and revocation;
+- active/revoked enforcement at the firmware WebSocket edge;
+- legacy fleet token cannot impersonate an active device.
 
 Separate:
 

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { createLibopusWasmCodecFactory } from "./audio/libopus-wasm.js";
 import { loadProvidersConfig } from "./config/providers.js";
+import { DeviceRegistry } from "./device/registry.js";
 import { FirmwareVoiceBridge } from "./device/voice-bridge.js";
 import {
   createGatewayServer,
@@ -43,10 +44,16 @@ async function createFirmwareVoiceFactory(): Promise<
 async function main(): Promise<void> {
   const port = Number(process.env.PORT ?? 8787);
   const deviceToken = process.env.NARA_DEVICE_TOKEN;
+  const deviceRegistryFile =
+    process.env.NARA_DEVICE_REGISTRY_FILE ?? "data/device-registry.json";
+  const deviceRegistry = await DeviceRegistry.open({
+    filePath: deviceRegistryFile
+  });
   const firmwareSessionFactory = await createFirmwareVoiceFactory();
 
   const options: GatewayOptions = {
     ...(deviceToken ? { deviceToken } : {}),
+    deviceRegistry,
     ...(firmwareSessionFactory ? { firmwareSessionFactory } : {})
   };
   const { server } = createGatewayServer(options);
@@ -54,6 +61,7 @@ async function main(): Promise<void> {
   server.listen(port, () => {
     console.log(`Companion gateway: http://localhost:${port}`);
     console.log(`Virtual device:   http://localhost:${port}/virtual-device`);
+    console.log(`Device registry:  ${deviceRegistryFile}`);
 
     if (!deviceToken) {
       console.warn(
