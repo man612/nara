@@ -188,6 +188,24 @@ For each request:
 
 Do not send an entire biography or memory database when the question needs one fact.
 
+## Multi-person and primary-person model
+
+A shared Nara may know several people while still having exactly one primary person for the default companion experience.
+
+The first product baseline is:
+
+- one primary recipient;
+- creator/trusted people as separate profiles;
+- household profiles where useful;
+- at most six enrolled speaker profiles;
+- unlimited unrecognized people treated as guest.
+
+The six-profile cap is a product/quality boundary, not a model limitation. It mirrors mature shared-speaker UX and keeps enrollment, calibration, false-match testing and permissions understandable.
+
+Primary status controls defaults such as greetings, idle personalization and recipient-focused experience. It must never bias biometric classification: an uncertain voice is guest/unknown, not "probably the primary person".
+
+Speaker recognition runs outside the LLM. The model should receive only a compact resolved identity hint when useful, never raw voice embeddings or the full candidate list. This avoids spending brain/voice tokens on a task better handled by a dedicated local/server model.
+
 ## Initial viewer identity
 
 Do not make voice biometrics a prerequisite for the first version.
@@ -243,6 +261,7 @@ Important constraints:
 - writes are validated before persistence;
 - unknown/invalid file versions fail closed rather than being silently trusted;
 - speaker recognition alone does not elevate a viewer for personal-memory access;
+- ambiguous or below-threshold speaker matches resolve to unknown/guest rather than the primary person;
 - the context composer receives only the store's already-filtered recall result;
 - tests capture the actual downstream brain request and assert that unauthorized marker text is absent;
 - memory text is serialized as reference data and explicitly marked as data rather than instructions.
