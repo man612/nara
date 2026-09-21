@@ -1,6 +1,6 @@
 # First-use onboarding and identity
 
-Status: research-backed design proposal, not yet implemented.
+Status: device-registry and one-time claim core implemented; phone/web account UX, passkeys and device-side claim delivery remain staged.
 
 Last reviewed: 2026-09-21
 
@@ -37,9 +37,9 @@ Each Nara body should have a stable device ID and a device-specific cryptographi
 
 The device credential authenticates hardware to Nara Gateway. It is not a person's password and should never be spoken.
 
-For production, replace the current single global `NARA_DEVICE_TOKEN` with per-device credentials so compromise of one device does not authorize every Nara device.
+Nara now has a server-side device registry with `unclaimed`, `claim_pending`, `active` and `revoked` states. Completing a claim issues a high-entropy per-device bearer credential; only its SHA-256 hash is persisted. Credentials support rotation and revocation.
 
-A simple first implementation can use a high-entropy per-device bearer credential with rotation/revocation. A later hardened version can use a device-generated asymmetric key pair whose private key never leaves the device.
+The legacy global `NARA_DEVICE_TOKEN` remains only as a development/bootstrap compatibility path. Once a registry device is `active`, the global token cannot impersonate that device. A later hardened version can use a device-generated asymmetric key pair whose private key never leaves the device.
 
 ### Account/person identity
 
@@ -235,19 +235,21 @@ Current firmware already provides useful primitives:
 - eFuse serial-number handling and optional HMAC challenge support in inherited activation code;
 - WebSocket bearer token sent to Nara Gateway.
 
-Current server supports optional bearer authentication at `/device`, but currently uses one configured `NARA_DEVICE_TOKEN`. That is suitable for development and should evolve into a device registry with per-device credentials before multi-device production.
+Current server now supports a persistent runtime-private device registry and per-device credential enforcement at `/device`. Claim transactions are one-time, short-lived, bound to one device, require both account approval and a separate physical approval, and are consumed when a device credential is issued. Rotation/revocation and restart persistence are covered by tests.
 
-One cleanup found during review: Wi-Fi config still uses the inherited `Xiaozhi` SSID prefix. Rename it to Nara before shipping.
+The public HTTP account/passkey claim experience is intentionally not exposed yet: account authentication must exist before an account-approval endpoint can be safe.
+
+Firmware provisioning branding has been cleaned up to Nara. Production secure provisioning still needs to replace the inherited open hotspot path before shipping.
 
 ## Suggested implementation order
 
-1. Define distinct account/person/device/relationship/role IDs.
-2. Add a server-side device registry with unclaimed, claim-pending, active, and revoked states.
-3. Add one-time claim transactions with high-entropy internal token, short human code, TTL and rate limiting.
-4. Add a web claim flow and QR payload.
-5. Add passkey registration/sign-in plus recovery fallback.
-6. Replace production use of the global gateway token with per-device credential issuance/revocation.
-7. Add local physical approval to final claim.
+1. Define distinct account/person/device/relationship/role IDs. — partially implemented at the device/account boundary.
+2. Add a server-side device registry with unclaimed, claim-pending, active, and revoked states. — implemented.
+3. Add one-time claim transactions with high-entropy internal token, short human code, TTL and replay/device-binding protection. — implemented; external rate limiting belongs at the future HTTP claim edge.
+4. Add a web claim flow and QR payload. — next.
+5. Add passkey registration/sign-in plus recovery fallback. — next.
+6. Replace production use of the global gateway token with per-device credential issuance/revocation. — registry enforcement implemented; firmware claim delivery/provisioning remains.
+7. Add local physical approval to final claim. — server requirement implemented; firmware/UI signal remains.
 8. Connect claimed identity to viewer resolution and personal-memory access.
 9. Add optional voice enrollment after secure claim works.
 10. Add reset/unlink/transfer/credential-rotation tests.
