@@ -2,6 +2,30 @@
 
 This is a compact record so future contributors and coding agents do not repeat the same research.
 
+## Hermes Agent / SOUL.md + USER.md + MEMORY.md
+
+Purpose: reference for separating agent identity, user profile, learned memory, and project instructions.
+
+Upstream: NousResearch/hermes-agent.
+
+Useful ideas:
+
+- `SOUL.md` is agent/instance identity and communication style, not a dump of user facts;
+- `USER.md` and `MEMORY.md` are distinct from agent personality;
+- `AGENTS.md`/project context remains project-specific;
+- stable memory/context snapshots can help prompt-prefix caching;
+- multiple profiles should have independent identity/memory/state.
+
+Decision:
+
+Adopt the conceptual separation, not Hermes' exact filesystem contract. Nara needs stronger multi-person semantics: personal facts have a subject and viewer/access policy, and unauthorized facts are filtered before LLM context construction. Hermes remains an optional backend/delegation target rather than a required runtime.
+
+References:
+
+- https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/which-file-does-what.md
+- https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/personality.md
+- https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/profiles.md
+
 ## XiaoZhi ESP32
 
 Purpose: initial ESP32 board/audio/network foundation and Waveshare 1.85B support.

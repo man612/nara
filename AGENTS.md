@@ -8,15 +8,23 @@ Build Nara as a provider-neutral runtime for expressive physical AI. No characte
 
 Before broad exploration:
 1. read `docs/REPO_MAP.md`;
-2. read only the focused design doc relevant to the issue;
-3. use `rg`/targeted search before opening large files;
-4. avoid scanning `nara-firmware` when a task is server-only, and vice versa.
+2. read `docs/PROJECT_STATE.md` for the current checkpoint, next milestone, blockers, and hardware state;
+3. read only the focused design doc relevant to the issue;
+4. use `rg`/targeted search before opening large files;
+5. avoid scanning `nara-firmware` when a task is server-only, and vice versa.
 
-Do not spend agent context rediscovering decisions recorded in `docs/`.
+Do not spend agent context rediscovering decisions recorded in `docs/`. Do not rely on chat history as the only record of project direction.
 
 ## Architectural rules
 
-- "doi" is a profile, never a core concept.
+- "doi"/partner is a profile, never a core concept.
+- The first partner-focused deployment must not prevent future multi-person use.
+- Keep companion identity, human/person profiles, durable personal memory, and project-development instructions separate.
+- Personal memory must be subject-aware and viewer-aware.
+- Filter unauthorized personal facts before they enter model context.
+- Unknown viewers default to least privilege.
+- Never commit real names/biographies/private relationship context, recordings, credentials, or personal memory data to this public repository.
+- Use role aliases such as `owner`, `partner`, and `guest` in public examples/tests.
 - Keep voice, brain, search, memory, tools, and device transport behind interfaces.
 - Never put third-party API keys in ESP32 firmware.
 - Keep low-latency audio transport separate from slow agent/tool work.
@@ -29,6 +37,18 @@ Do not spend agent context rediscovering decisions recorded in `docs/`.
 - Normalize provider usage before cost accounting; do not bake volatile prices into adapters.
 - Keep stable prompt prefixes stable so provider caching can work.
 - Do not send large memory/search/tool dumps to a model when a small structured subset is enough.
+
+## Durable project memory
+
+After a meaningful implementation batch:
+
+- update `docs/PROJECT_STATE.md` when completed/next/blocked state changed;
+- add durable choices to `docs/DECISIONS.md`;
+- add significant external findings to `docs/RESEARCH_SOURCES.md`;
+- update `docs/HARDWARE_PLAN.md` when purchase/test state changes;
+- keep README status truthful.
+
+If a future coding agent cannot reconstruct why the next task exists from the repository, the repository context is incomplete.
 
 ## Development
 

@@ -2,6 +2,15 @@
 
 Read this before broad code search.
 
+## Durable project context
+
+- `docs/PROJECT_STATE.md` — canonical checkpoint: what is real, what is next, blockers, and update discipline.
+- `docs/DECISIONS.md` — compact durable architecture/product decision log.
+- `docs/HARDWARE_PLAN.md` — what physical hardware is targeted, what to buy, and when.
+- `docs/PERSONAL_KNOWLEDGE.md` — multi-person/private-memory architecture and access rules.
+- `docs/PERSONAL_PROFILE_TEMPLATE.md` — template for future private owner onboarding; never commit a filled real profile.
+- `docs/RESEARCH_SOURCES.md` — external projects evaluated, useful ideas, licenses, and decisions.
+
 ## Runtime entry
 
 - `src/index.ts` — process/bootstrap entry only. Keep it thin.
@@ -9,6 +18,14 @@ Read this before broad code search.
 - `src/contracts/device.ts` — hardware-neutral semantic device messages.
 - `src/contracts/providers.ts` — voice/brain/search/memory contracts and normalized usage.
 - `src/provider-registry.ts` — provider construction and fallback composition.
+
+## Personal memory
+
+- `src/memory/personal.ts` — first local personal-memory adapter: subject/viewer-aware access filtering, bounded lexical recall, expiry, edit/delete, and file persistence.
+- `tests/personal-memory.test.ts` — privacy, partner/guest, persistence, expiry, edit/delete, and recall-limit coverage.
+- `data/` — intended runtime-private state boundary; gitignored and never a source file directory.
+
+The current file adapter is a replaceable first implementation, not permission to bypass the memory boundary elsewhere.
 
 ## Device edge
 
@@ -53,7 +70,7 @@ Read this before broad code search.
 - `docs/PROVIDERS.md` — provider strategy.
 - `docs/VOICE_RUNTIME.md` — realtime voice/runtime choices.
 - `docs/COST_EFFICIENCY.md` — token/API cost rules.
-- `docs/RESEARCH_SOURCES.md` — external codebases evaluated and license constraints.
+- `docs/PERSONAL_KNOWLEDGE.md` — private personal-memory and multi-person access model.
 
 ## Tests
 
@@ -70,5 +87,6 @@ Read this before broad code search.
 - `tests/provider-config.test.ts`
 - `tests/provider-usage.test.ts`
 - `tests/fallback-brain.test.ts`
+- `tests/personal-memory.test.ts`
 
 Agents should inspect only the files relevant to the current issue before expanding scope.
