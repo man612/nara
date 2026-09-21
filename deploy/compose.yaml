@@ -9,6 +9,8 @@ services:
     environment:
       PORT: 8787
       NARA_DEVICE_REGISTRY_FILE: /app/data/device-registry.json
+      NARA_PERSONAL_MEMORY_FILE: /app/data/personal-memory.json
+      NARA_MEMORY_SUBJECT_ID: ${NARA_MEMORY_SUBJECT_ID:-}
       HERMES_BASE_URL: ${HERMES_BASE_URL:-http://hermes:8642/v1}
     volumes:
       - nara-data:/app/data
