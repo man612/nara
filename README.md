@@ -86,47 +86,68 @@ sketch.
 The physical realtime voice path supports firmware WebSocket/Opus framing,
 session-scoped Opus/PCM transcoding, Gemini Live, provider-neutral
 voice-session contracts, connect-time fallback, bounded playback pacing,
-interruption/barge-in lifecycle, tool calls, and usage/token accounting.
-Automated coverage includes a real-Opus firmware-to-provider round trip.
+interruption/barge-in lifecycle, compact tool calls, normalized usage
+accounting, and measured turn-end -> first-provider-audio -> first-device-audio
+latency. Automated coverage includes a real-Opus firmware-to-provider round
+trip and a production Node 24 Alpine image smoke test.
 
-The Action Runtime executes compact, validated tools without exposing
+The Action Runtime executes compact validated tools without exposing
 firmware-specific MCP details to the model. Implemented capabilities include
-device status/volume, physical-reflex customization, privacy-filtered
-personal-memory retrieval, Spotify playback/search/control, and local
-RTC-backed utility controls.
+device status/volume, physical-reflex customization, RTC-backed utilities,
+privacy-filtered personal-memory retrieval, Spotify search/playback/control,
+deterministic weather/briefings, provider balance checks, voice-token budget
+guards, network diagnostics, and optional Hermes Runs API delegation.
+
+Companion services are deliberately cost-aware. Weather, provider balance,
+latency/status checks, local notifications, speed tests, physical reflexes and
+the offline Nara Says minigame do not need an LLM call. Realtime voice token
+usage can be constrained by a local daily soft budget, while DeepSeek and
+OpenRouter account/key status can be checked directly where their APIs expose
+it. Hermes is optional and intended for long-running browser/research/agent
+work rather than simple realtime turns.
+
+Telegram integration is allowlisted. When a firmware voice session is already
+open, remote text can be injected immediately. When the device is idle, Nara
+stores work in a bounded durable per-device inbox. Firmware polls that small
+authenticated control edge without keeping the realtime AI session alive.
+Token-free notifications are rendered locally; queued voice requests cause a
+one-shot voice channel to open only when needed. The queued prompt remains
+server-side rather than being exposed through the polling response.
 
 Identity and memory have fail-closed boundaries. Devices have a persistent
 claim/credential lifecycle with rotation and revocation. Personal facts are
 subject/viewer-aware, validated before persistence, and filtered before model
-context. Realtime voice deliberately remains guest/public-scoped until a
-strong authenticated human viewer is bound to the session; speaker recognition
-is personalization evidence, not root authorization.
+context. Realtime physical voice deliberately remains guest/public-scoped until
+a strong authenticated human viewer is bound to the session; speaker
+recognition is personalization evidence, not root authorization. Authenticated
+phone sessions already have a strong bearer-based viewer boundary, while a
+passkey-first production account/recovery UX remains future hardening.
 
-The standalone Waveshare 1.85B firmware builds in CI and includes Nara's
-parametric face, local audio-driven mouth motion, CST816S touch input,
+The standalone Waveshare 1.85B firmware builds in full ESP-IDF CI and includes
+Nara's parametric face, local audio-driven mouth motion, CST816S touch input,
 touch-driven gaze, touch/IMU physical reflexes, flip/shake/spin classifiers,
 persistent custom reaction packs, RTC-backed clock/timer/alarm foundations,
-battery policy, Wi-Fi saved-network recovery, useful no-network idle behavior,
-and an authenticated OTA path.
+battery policy, saved-Wi-Fi recovery, useful no-network idle behavior,
+authenticated OTA, a recipient-safe offline personal capsule reader, the
+token-free Nara Says physical minigame, and lightweight network diagnostics.
 
-A separate authenticated browser phone-audio bridge is also implemented. A
-phone can provide microphone/audio output to the same provider-neutral voice
-runtime; when a TWS headset is routed through the phone OS, the browser path
-can use that phone/TWS audio route. The phone credential is isolated from
-firmware credentials and does not automatically grant private-memory access.
+A separate authenticated browser phone-audio bridge is implemented. A phone
+can provide microphone/audio output to the same provider-neutral voice runtime;
+when a TWS headset is routed through the phone OS, the browser path can use
+that phone/TWS audio route. The phone credential is isolated from firmware
+credentials and does not automatically grant private-memory access.
 
 Optional external local vision for the Waveshare target is implemented in
 Nara Firmware. A compatible SSCMA vision module can return compact local
 detection boxes; normalized gaze coordinates drive Nara's eyes without
 streaming ordinary tracking frames to the LLM.
 
-What remains cannot be truthfully marked complete from CI alone: physical
-microphone/AEC/speaker tuning, final gesture calibration, battery-life
-measurements, phone/TWS browser validation on target devices, and external
-camera field-of-view/orientation calibration. Product work still staged
-includes strong human/passkey authorization for private-memory privilege,
-offline capsule device UX, production commissioning/direct-peer hardening, and
-optional additional voice/search/delegation providers.
+The major remaining uncertainties are now physical or production-hardening
+items rather than missing core companion logic: microphone/AEC/speaker tuning,
+final gesture calibration, battery-life and polling measurements, phone/TWS
+validation on real devices, external-camera field-of-view/orientation,
+passkey/recovery UX, production secure commissioning/direct-peer mode, and
+optional additional voice/search/local-network providers.
 
 ## Ownership and licensing
 
