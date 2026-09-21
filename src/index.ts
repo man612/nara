@@ -12,6 +12,7 @@ import { DeviceUpdateChannels } from "./ota/channels.js";
 import { createOtaHttpHandler } from "./ota/http.js";
 import {
   createGatewayServer,
+  isGatewayDeviceAuthorized,
   type FirmwareSessionFactory,
   type GatewayOptions
 } from "./gateway.js";
@@ -160,6 +161,11 @@ async function main(): Promise<void> {
       createOtaHttpHandler({
         catalog: otaCatalog,
         channels: otaChannels,
+        authorizeDevice: (request) =>
+          isGatewayDeviceAuthorized(request, {
+            ...(deviceToken ? { deviceToken } : {}),
+            deviceRegistry
+          }),
         ...(process.env.NARA_OTA_ADMIN_TOKEN
           ? { adminToken: process.env.NARA_OTA_ADMIN_TOKEN }
           : {})
