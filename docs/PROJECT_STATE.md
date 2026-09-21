@@ -59,7 +59,7 @@ Real names, private biography, relationship details, credentials, recordings and
 
 ### Optional external local vision
 
-Implementation exists on firmware PR #13 and is in final full-target CI at this checkpoint.
+Implementation is merged in Nara Firmware and passed host checks, face-simulator tests and the full Waveshare 1.85B ESP-IDF build.
 
 It provides:
 
