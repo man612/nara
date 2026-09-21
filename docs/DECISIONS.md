@@ -87,3 +87,20 @@ Consequences:
 - local-network STT/brain/TTS may be provided by replaceable local services without changing the device protocol;
 - owner-private facts are never copied into a recipient's offline capsule;
 - Bluetooth LE is for control/sync on ESP32-S3, not assumed to be an audio transport.
+
+
+## 2026-09-21 — Physical interactions are local-first reflexes
+
+**Status:** accepted
+
+Touch and motion reactions are part of Nara's physical personality and must not depend on an LLM or Internet connection for their first response.
+
+Consequences:
+
+- CST816S/QMI8658 data is classified locally into semantic gestures;
+- face/gaze/local sound reactions happen on-device;
+- only compact derived events are sent to the gateway when useful;
+- raw high-rate touch/IMU streams are not cloud telemetry by default;
+- speech is optional enrichment and should be rare enough not to become annoying;
+- thresholds are calibrated on the real 1.85B and final enclosure;
+- body-wide petting outside the touchscreen is not promised without an added touch sensor.
