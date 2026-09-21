@@ -8,7 +8,10 @@ services:
       - ../.env
     environment:
       PORT: 8787
+      NARA_DEVICE_REGISTRY_FILE: /app/data/device-registry.json
       HERMES_BASE_URL: ${HERMES_BASE_URL:-http://hermes:8642/v1}
+    volumes:
+      - nara-data:/app/data
     ports:
       - "${NARA_PORT:-8787}:8787"
     networks:
@@ -35,4 +38,5 @@ networks:
     driver: bridge
 
 volumes:
+  nara-data:
   hermes-data:
