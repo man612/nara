@@ -1,6 +1,8 @@
 import "dotenv/config";
 import { createLibopusWasmCodecFactory } from "./audio/libopus-wasm.js";
 import { loadProvidersConfig } from "./config/providers.js";
+import { createPersonalContentHttpHandler } from "./content/http.js";
+import { PersonalContentService } from "./content/personal-content.js";
 import { DeviceRegistry } from "./device/registry.js";
 import { FirmwareVoiceBridge } from "./device/voice-bridge.js";
 import { FilePersonalMemoryStore } from "./memory/personal.js";
@@ -73,20 +75,77 @@ async function main(): Promise<void> {
 
   const personalMemoryFile = process.env.NARA_PERSONAL_MEMORY_FILE;
   const memorySubjectId = process.env.NARA_MEMORY_SUBJECT_ID;
+  const personalMemoryStore = personalMemoryFile
+    ? new FilePersonalMemoryStore(personalMemoryFile)
+    : undefined;
   const voiceMemory =
-    personalMemoryFile && memorySubjectId
+    personalMemoryStore && memorySubjectId
       ? {
-          store: new FilePersonalMemoryStore(personalMemoryFile),
+          store: personalMemoryStore,
           subjectId: memorySubjectId
         }
       : undefined;
 
   const firmwareSessionFactory = await createFirmwareVoiceFactory(voiceMemory);
 
+  const contentToken = process.env.NARA_CONTENT_ADMIN_TOKEN;
+  const contentSubjectId = process.env.NARA_CONTENT_AUTHOR_SUBJECT_ID;
+  const contentAllowedViewerIds = (
+    process.env.NARA_CONTENT_ALLOWED_VIEWER_IDS ?? ""
+  )
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const contentDefaultViewerIds = (
+    process.env.NARA_CONTENT_DEFAULT_VIEWER_IDS ??
+    process.env.NARA_CONTENT_ALLOWED_VIEWER_IDS ??
+    ""
+  )
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const contentConfigPresent =
+    contentToken !== undefined ||
+    contentSubjectId !== undefined ||
+    process.env.NARA_CONTENT_ALLOWED_VIEWER_IDS !== undefined;
+
+  if (
+    contentConfigPresent &&
+    (!contentToken ||
+      !contentSubjectId ||
+      !personalMemoryStore ||
+      contentAllowedViewerIds.length === 0)
+  ) {
+    throw new Error(
+      "Remote personal content requires NARA_CONTENT_ADMIN_TOKEN, " +
+        "NARA_CONTENT_AUTHOR_SUBJECT_ID, NARA_CONTENT_ALLOWED_VIEWER_IDS, " +
+        "and NARA_PERSONAL_MEMORY_FILE"
+    );
+  }
+
+  const httpHandlers: NonNullable<GatewayOptions["httpHandlers"]> = [];
+  if (contentToken && contentSubjectId && personalMemoryStore) {
+    const contentService = new PersonalContentService(personalMemoryStore, {
+      subjectId: contentSubjectId,
+      allowedViewerIds: contentAllowedViewerIds,
+      defaultViewerIds: contentDefaultViewerIds,
+      allowPublic:
+        process.env.NARA_CONTENT_ALLOW_PUBLIC?.toLowerCase() === "true"
+    });
+    httpHandlers.push(
+      createPersonalContentHttpHandler({
+        service: contentService,
+        bearerToken: contentToken
+      })
+    );
+  }
+
   const options: GatewayOptions = {
     ...(deviceToken ? { deviceToken } : {}),
     deviceRegistry,
-    ...(firmwareSessionFactory ? { firmwareSessionFactory } : {})
+    ...(firmwareSessionFactory ? { firmwareSessionFactory } : {}),
+    ...(httpHandlers.length > 0 ? { httpHandlers } : {})
   };
   const { server } = createGatewayServer(options);
 
@@ -97,6 +156,11 @@ async function main(): Promise<void> {
     if (voiceMemory) {
       console.log(
         `Voice memory:      guest/public scope subject=${voiceMemory.subjectId} file=${personalMemoryFile}`
+      );
+    }
+    if (contentToken && contentSubjectId) {
+      console.log(
+        `Personal content:  scoped author subject=${contentSubjectId} viewers=${contentAllowedViewerIds.join(",")}`
       );
     }
 
