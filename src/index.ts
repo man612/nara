@@ -12,6 +12,8 @@ import { HttpSpeakerIdentityProvider } from "./identity/speaker-http.js";
 import { SpeakerTurnRecognizer } from "./identity/speaker-turn.js";
 import { FilePersonalMemoryStore } from "./memory/personal.js";
 import { PersonalMemoryToolProvider } from "./memory/tool-provider.js";
+import { SpotifyWebApiProvider } from "./media/spotify.js";
+import { MediaToolProvider } from "./media/tool-provider.js";
 import { GitHubReleaseOtaCatalog } from "./ota/catalog.js";
 import { DeviceUpdateChannels } from "./ota/channels.js";
 import { createOtaHttpHandler } from "./ota/http.js";
@@ -44,7 +46,8 @@ function requiredNumber(name: string): number {
 
 async function createFirmwareVoiceFactory(
   voiceMemory?: VoiceMemoryRuntime,
-  speakerRuntime?: SpeakerRuntime
+  speakerRuntime?: SpeakerRuntime,
+  mediaTools?: MediaToolProvider
 ): Promise<FirmwareSessionFactory | undefined> {
   const providersFile = process.env.PROVIDERS_FILE;
   if (!providersFile) {
@@ -84,17 +87,21 @@ async function createFirmwareVoiceFactory(
           }
         }
       : {}),
-    ...(voiceMemory
+    ...(voiceMemory || mediaTools
       ? {
           createToolProviders: () => [
-            // Device authentication proves which Nara body connected, not who
-            // is currently speaking. Until a strong viewer signal is wired,
-            // realtime voice is intentionally guest-scoped and can retrieve
-            // public facts only.
-            new PersonalMemoryToolProvider(voiceMemory.store, {
-              viewerId: "person:guest",
-              subjectId: voiceMemory.subjectId
-            })
+            ...(voiceMemory
+              ? [
+                  // Device authentication proves which Nara body connected,
+                  // not who is currently speaking. Realtime personal recall
+                  // therefore remains guest/public-scoped for now.
+                  new PersonalMemoryToolProvider(voiceMemory.store, {
+                    viewerId: "person:guest",
+                    subjectId: voiceMemory.subjectId
+                  })
+                ]
+              : []),
+            ...(mediaTools ? [mediaTools] : [])
           ]
         }
       : {})
@@ -161,9 +168,38 @@ async function main(): Promise<void> {
     };
   }
 
+  const spotifyValues = {
+    clientId: process.env.SPOTIFY_CLIENT_ID,
+    clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+    refreshToken: process.env.SPOTIFY_REFRESH_TOKEN
+  };
+  const spotifyConfigured = Object.values(spotifyValues).some(
+    (value) => value !== undefined
+  );
+  let mediaTools: MediaToolProvider | undefined;
+  if (spotifyConfigured) {
+    if (
+      !spotifyValues.clientId ||
+      !spotifyValues.clientSecret ||
+      !spotifyValues.refreshToken
+    ) {
+      throw new Error(
+        "Spotify media requires SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, and SPOTIFY_REFRESH_TOKEN"
+      );
+    }
+    mediaTools = new MediaToolProvider(
+      new SpotifyWebApiProvider({
+        clientId: spotifyValues.clientId,
+        clientSecret: spotifyValues.clientSecret,
+        refreshToken: spotifyValues.refreshToken
+      })
+    );
+  }
+
   const firmwareSessionFactory = await createFirmwareVoiceFactory(
     voiceMemory,
-    speakerRuntime
+    speakerRuntime,
+    mediaTools
   );
 
   const contentToken = process.env.NARA_CONTENT_ADMIN_TOKEN;
@@ -268,6 +304,9 @@ async function main(): Promise<void> {
       console.log(
         `Speaker identity:  profiles=${speakerRuntime.directory.getSpeakerCandidates().length} primary=${speakerRuntime.directory.getPrimary().displayName} file=${peopleFile}`
       );
+    }
+    if (mediaTools) {
+      console.log("Media control:     Spotify Web API enabled");
     }
     if (contentToken && contentSubjectId) {
       console.log(
