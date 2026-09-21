@@ -5,6 +5,11 @@ import { createPersonalContentHttpHandler } from "./content/http.js";
 import { PersonalContentService } from "./content/personal-content.js";
 import { DeviceRegistry } from "./device/registry.js";
 import { FirmwareVoiceBridge } from "./device/voice-bridge.js";
+import type { PersonDirectory } from "./identity/directory.js";
+import { loadPersonDirectoryFile } from "./identity/file-directory.js";
+import { SpeakerIdentityService } from "./identity/speaker.js";
+import { HttpSpeakerIdentityProvider } from "./identity/speaker-http.js";
+import { SpeakerTurnRecognizer } from "./identity/speaker-turn.js";
 import { FilePersonalMemoryStore } from "./memory/personal.js";
 import { PersonalMemoryToolProvider } from "./memory/tool-provider.js";
 import { GitHubReleaseOtaCatalog } from "./ota/catalog.js";
@@ -23,8 +28,23 @@ type VoiceMemoryRuntime = {
   subjectId: string;
 };
 
+type SpeakerRuntime = {
+  directory: PersonDirectory;
+  service: SpeakerIdentityService;
+};
+
+function requiredNumber(name: string): number {
+  const raw = process.env[name];
+  const value = raw === undefined ? Number.NaN : Number(raw);
+  if (!Number.isFinite(value)) {
+    throw new Error(`${name} must be configured as a finite number`);
+  }
+  return value;
+}
+
 async function createFirmwareVoiceFactory(
-  voiceMemory?: VoiceMemoryRuntime
+  voiceMemory?: VoiceMemoryRuntime,
+  speakerRuntime?: SpeakerRuntime
 ): Promise<FirmwareSessionFactory | undefined> {
   const providersFile = process.env.PROVIDERS_FILE;
   if (!providersFile) {
@@ -46,6 +66,24 @@ async function createFirmwareVoiceFactory(
         `[firmware:${session.sessionId}] tool call name=${event.name} id=${event.callId ?? "?"}`
       );
     },
+    ...(speakerRuntime
+      ? {
+          createSpeakerRecognizer: () =>
+            new SpeakerTurnRecognizer(speakerRuntime.service),
+          onSpeakerIdentity: (session, decision) => {
+            if (decision.kind === "known") {
+              const person = speakerRuntime.directory.get(decision.personId);
+              console.log(
+                `[firmware:${session.sessionId}] speaker=${person?.displayName ?? decision.personId} confidence=${decision.confidence.toFixed(3)} margin=${decision.margin.toFixed(3)} provider=${decision.providerId}`
+              );
+            } else {
+              console.log(
+                `[firmware:${session.sessionId}] speaker=guest reason=${decision.reason} provider=${decision.providerId}`
+              );
+            }
+          }
+        }
+      : {}),
     ...(voiceMemory
       ? {
           createToolProviders: () => [
@@ -90,7 +128,43 @@ async function main(): Promise<void> {
         }
       : undefined;
 
-  const firmwareSessionFactory = await createFirmwareVoiceFactory(voiceMemory);
+  const peopleFile = process.env.NARA_PEOPLE_FILE;
+  const speakerEndpoint = process.env.NARA_SPEAKER_ID_URL;
+  const speakerConfigPresent =
+    peopleFile !== undefined ||
+    speakerEndpoint !== undefined ||
+    process.env.NARA_SPEAKER_MIN_CONFIDENCE !== undefined ||
+    process.env.NARA_SPEAKER_MIN_MARGIN !== undefined ||
+    process.env.NARA_SPEAKER_MIN_AUDIO_MS !== undefined;
+
+  let speakerRuntime: SpeakerRuntime | undefined;
+  if (speakerConfigPresent) {
+    if (!peopleFile || !speakerEndpoint) {
+      throw new Error(
+        "Speaker identity requires NARA_PEOPLE_FILE and NARA_SPEAKER_ID_URL"
+      );
+    }
+
+    const directory = await loadPersonDirectoryFile(peopleFile);
+    const provider = new HttpSpeakerIdentityProvider(speakerEndpoint, {
+      ...(process.env.NARA_SPEAKER_SERVICE_TOKEN
+        ? { bearerToken: process.env.NARA_SPEAKER_SERVICE_TOKEN }
+        : {})
+    });
+    speakerRuntime = {
+      directory,
+      service: new SpeakerIdentityService(provider, directory, {
+        minConfidence: requiredNumber("NARA_SPEAKER_MIN_CONFIDENCE"),
+        minMargin: requiredNumber("NARA_SPEAKER_MIN_MARGIN"),
+        minAudioMs: requiredNumber("NARA_SPEAKER_MIN_AUDIO_MS")
+      })
+    };
+  }
+
+  const firmwareSessionFactory = await createFirmwareVoiceFactory(
+    voiceMemory,
+    speakerRuntime
+  );
 
   const contentToken = process.env.NARA_CONTENT_ADMIN_TOKEN;
   const contentSubjectId = process.env.NARA_CONTENT_AUTHOR_SUBJECT_ID;
@@ -188,6 +262,11 @@ async function main(): Promise<void> {
     if (voiceMemory) {
       console.log(
         `Voice memory:      guest/public scope subject=${voiceMemory.subjectId} file=${personalMemoryFile}`
+      );
+    }
+    if (speakerRuntime && peopleFile) {
+      console.log(
+        `Speaker identity:  profiles=${speakerRuntime.directory.getSpeakerCandidates().length} primary=${speakerRuntime.directory.getPrimary().displayName} file=${peopleFile}`
       );
     }
     if (contentToken && contentSubjectId) {
