@@ -26,6 +26,10 @@ Do not spend agent context rediscovering decisions recorded in `docs/`. Do not r
 - Never commit real names/biographies/private relationship context, recordings, credentials, or personal memory data to this public repository.
 - Use role aliases such as `owner`, `partner`, and `guest` in public examples/tests.
 - Keep voice, brain, search, memory, tools, and device transport behind interfaces.
+- Internet loss must degrade capabilities, not make the physical companion useless; read `docs/OFFLINE_RUNTIME.md` for offline capability levels.
+- Keep connectivity state separate from interaction state. Temporary Wi-Fi loss must not be treated as permanent first-time setup.
+- Do not promise unrestricted Indonesian STT/TTS on the ESP32-S3 alone; guaranteed offline interaction needs touch/button fallbacks.
+- Offline personal capsules must contain only facts already authorized for that recipient/device.
 - Never put third-party API keys in ESP32 firmware.
 - Keep low-latency audio transport separate from slow agent/tool work.
 - Hermes may be an optional brain/tool backend, not a required runtime.

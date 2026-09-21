@@ -47,7 +47,7 @@ Start with:
 - `docs/REPO_MAP.md`
 - `docs/PROJECT_STATE.md`
 
-Personal/multi-person memory design lives in `docs/PERSONAL_KNOWLEDGE.md`. Hardware purchase/test state lives in `docs/HARDWARE_PLAN.md`. Durable architectural choices live in `docs/DECISIONS.md`.
+Personal/multi-person memory design lives in `docs/PERSONAL_KNOWLEDGE.md`. Offline-first behavior lives in `docs/OFFLINE_RUNTIME.md`. Hardware purchase/test state lives in `docs/HARDWARE_PLAN.md`. Durable architectural choices live in `docs/DECISIONS.md`.
 
 Real personal knowledge is runtime-private and must never be committed to this public repository.
 
@@ -63,4 +63,4 @@ Nara also has a provider-neutral Action Runtime. Gemini Live can receive compact
 
 The standalone firmware also has the portable Nara face engine integrated into the Waveshare runtime.
 
-The next architectural milestone is a local personal-memory/context vertical slice with multi-person access control, followed by hardware-in-the-loop voice/action validation, search, optional Hermes delegation, additional production voice adapters, and later in-session provider recovery where it is technically safe.
+The next architectural milestones are the local personal-memory/context vertical slice and an offline runtime foundation where loss of Internet degrades capabilities instead of making the companion useless. Hardware-in-the-loop voice/action validation, search, optional Hermes delegation, additional production voice adapters, and later in-session provider recovery follow.

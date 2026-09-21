@@ -45,6 +45,8 @@ The transport, voice, provider, and first action vertical slices are far enough 
 
 Do not expand into many unrelated tools before a minimal memory/context path exists.
 
+Offline usefulness is now a core product requirement. The current firmware does not yet provide a real offline product mode; no-network startup still tends toward Wi-Fi configuration and cloud conversation depends on a reachable gateway. See `docs/OFFLINE_RUNTIME.md`.
+
 ## Immediate work order
 
 ### P0 — durable project context
@@ -97,14 +99,32 @@ Separate:
 
 Build a context composer that selects the smallest relevant subset instead of concatenating all memory.
 
-### P3 — memory in conversation
+### P3 — offline runtime foundation
+
+Status: designed, not implemented.
+
+Next offline milestones:
+
+- separate connectivity status from interaction state;
+- useful no-network startup instead of a setup dead-end;
+- local clock/timer/alarm/status/navigation;
+- authorized offline personal capsule;
+- reconnect/sync behavior;
+- optional direct-phone peer mode;
+- later local-network STT/brain/TTS.
+
+Do not promise unrestricted Indonesian STT/TTS on ESP32 alone; official ESP-SR command recognition is Chinese/English and its embedded TTS is Chinese-only.
+
+See `docs/OFFLINE_RUNTIME.md`.
+
+### P4 — memory in conversation
 
 - text-path integration first because it is easier to test deterministically;
 - then voice transcript -> memory candidate -> retrieval -> answer;
 - keep raw transcripts optional and short-lived;
 - summarize/normalize durable facts instead of storing every utterance forever.
 
-### P4 — hardware-in-the-loop validation
+### P5 — hardware-in-the-loop validation
 
 Buy/use the target board and validate:
 
@@ -129,7 +149,7 @@ Do not treat voice identity as a hard dependency: recognition failure must downg
 
 See `docs/HARDWARE_PLAN.md` and `docs/AUDIO_ROBUSTNESS.md`.
 
-### P5 — external knowledge and delegation
+### P6 — external knowledge and delegation
 
 After memory/context is trustworthy:
 
@@ -138,7 +158,7 @@ After memory/context is trustworthy:
 - additional voice providers;
 - reminders/calendar/home automation where useful.
 
-### P6 — multi-person experience
+### P7 — multi-person experience
 
 - multiple known people;
 - trusted/guest roles;
@@ -158,7 +178,9 @@ These are intentionally not treated as solved yet:
 - whether the 1.85B can and should expose both physical speech microphones plus playback reference to AFE after hardware validation;
 - import UX for large personal histories;
 - retention policy for raw transcripts;
-- how proactive speech should differ by viewer/profile.
+- how proactive speech should differ by viewer/profile;
+- exact local-network STT/TTS/LLM provider choices for Indonesian;
+- exact offline-capsule storage/index format and removable-media encryption scheme.
 
 When one of these becomes a real architectural decision, record it in `docs/DECISIONS.md`.
 
