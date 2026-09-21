@@ -1,3 +1,8 @@
+import type {
+  ToolDefinition,
+  ToolResult
+} from "../actions/contracts.js";
+
 export type AudioChunk = {
   format: "pcm16le";
   data: Uint8Array;
@@ -56,14 +61,20 @@ export type VoiceSessionEvent =
   | { type: "speech.stopped" }
   | { type: "interrupted" }
   | { type: "tool.call"; name: string; arguments: unknown; callId?: string }
+  | { type: "tool.cancel"; callIds: string[] }
   | { type: "usage"; usage: ProviderUsage }
   | { type: "error"; message: string };
 
 export type VoiceEventHandler = (event: VoiceSessionEvent) => void | Promise<void>;
 
+export type VoiceConnectOptions = {
+  tools?: ToolDefinition[];
+};
+
 export interface VoiceSession {
   sendAudio(chunk: AudioChunk): Promise<void>;
   sendText?(text: string): Promise<void>;
+  sendToolResult?(result: ToolResult): Promise<void>;
   /**
    * Signal that microphone audio has paused/ended while keeping the realtime
    * session itself open. Providers that use automatic VAD can use this to
@@ -77,5 +88,5 @@ export interface VoiceSession {
 
 export interface VoiceProvider {
   readonly id: string;
-  connect(): Promise<VoiceSession>;
+  connect(options?: VoiceConnectOptions): Promise<VoiceSession>;
 }
