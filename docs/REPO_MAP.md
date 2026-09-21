@@ -2,6 +2,15 @@
 
 Read this before broad code search.
 
+## Durable project context
+
+- `docs/PROJECT_STATE.md` — canonical checkpoint: what is real, what is next, blockers, and update discipline.
+- `docs/DECISIONS.md` — compact durable architecture/product decision log.
+- `docs/HARDWARE_PLAN.md` — what physical hardware is targeted, what to buy, and when.
+- `docs/PERSONAL_KNOWLEDGE.md` — multi-person/private-memory architecture and access rules.
+- `docs/PERSONAL_PROFILE_TEMPLATE.md` — template for future private owner onboarding; never commit a filled real profile.
+- `docs/RESEARCH_SOURCES.md` — external projects evaluated, useful ideas, licenses, and decisions.
+
 ## Runtime entry
 
 - `src/index.ts` — process/bootstrap entry only. Keep it thin.
@@ -53,7 +62,7 @@ Read this before broad code search.
 - `docs/PROVIDERS.md` — provider strategy.
 - `docs/VOICE_RUNTIME.md` — realtime voice/runtime choices.
 - `docs/COST_EFFICIENCY.md` — token/API cost rules.
-- `docs/RESEARCH_SOURCES.md` — external codebases evaluated and license constraints.
+- `docs/PERSONAL_KNOWLEDGE.md` — private personal-memory and multi-person access model.
 
 ## Tests
 
