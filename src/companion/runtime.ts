@@ -26,6 +26,8 @@ import {
 } from "../device/voice-control.js";
 import type { FirmwareSessionInfo } from "../gateway.js";
 import { TelegramBridge } from "../telegram/bridge.js";
+import { RemoteInbox } from "../remote/inbox.js";
+import { createRemoteInboxHttpHandler } from "../remote/http.js";
 import {
   VoiceLatencyMonitor,
   type VoiceLatencySample
@@ -82,6 +84,8 @@ export class CompanionRuntime {
   readonly voiceControls = new FirmwareVoiceControlRegistry();
   readonly latency = new VoiceLatencyMonitor();
 
+  private remoteInbox?: RemoteInbox;
+
   private hermes?: HermesAgentClient;
   private hermesTools?: HermesAgentToolProvider;
   private budgets?: ProviderBudgetMonitor;
@@ -94,8 +98,26 @@ export class CompanionRuntime {
   private briefingTimezone = "UTC";
   private started = false;
 
-  static fromEnvironment(): CompanionRuntime {
+  static async openFromEnvironment(): Promise<CompanionRuntime> {
     const runtime = new CompanionRuntime();
+    runtime.remoteInbox = await RemoteInbox.open({
+      filePath:
+        nonEmpty("NARA_REMOTE_INBOX_FILE") ??
+        "data/remote-inbox.json",
+      ttlMs:
+        Math.max(
+          1,
+          numberEnv("NARA_REMOTE_INBOX_TTL_MINUTES", 15)
+        ) * 60_000,
+      leaseMs:
+        Math.max(
+          5,
+          numberEnv("NARA_REMOTE_INBOX_LEASE_SECONDS", 45)
+        ) * 1000,
+      maxPerDevice: Math.trunc(
+        numberEnv("NARA_REMOTE_INBOX_MAX_PER_DEVICE", 16)
+      )
+    });
     runtime.configureFromEnvironment();
     return runtime;
   }
@@ -121,6 +143,7 @@ export class CompanionRuntime {
     control: FirmwareVoiceControl
   ): void {
     this.voiceControls.register(session, control);
+    void this.deliverLeasedRemoteVoice(session, control);
   }
 
   unregisterVoiceControl(session: FirmwareSessionInfo): void {
@@ -151,16 +174,33 @@ export class CompanionRuntime {
   }
 
   async handleOutputTranscript(
+    session: FirmwareSessionInfo,
     text: string,
     final: boolean
   ): Promise<void> {
-    await this.telegram?.handleOutputTranscript(text, final);
+    await this.telegram?.handleOutputTranscript(
+      session.sessionId,
+      text,
+      final
+    );
   }
 
   networkDiagnosticsHandler(
     authorize: (request: IncomingMessage) => boolean
   ) {
     return createNetworkDiagnosticsHttpHandler({ authorize });
+  }
+
+  remoteInboxHandler(
+    authorize: (request: IncomingMessage) => boolean
+  ) {
+    if (!this.remoteInbox) {
+      throw new Error("Remote inbox is not initialized");
+    }
+    return createRemoteInboxHttpHandler({
+      inbox: this.remoteInbox,
+      authorize
+    });
   }
 
   start(): void {
@@ -188,6 +228,12 @@ export class CompanionRuntime {
         : []),
       ...(this.telegram
         ? ["Telegram:          allowlisted long-poll bridge enabled"]
+        : []),
+      ...(this.remoteInbox
+        ? [
+            "Remote inbox:      durable idle delivery enabled, pending=" +
+              this.remoteInbox.pendingCount(this.targetDeviceId)
+          ]
         : []),
       ...(this.dailyBriefing
         ? [
@@ -334,6 +380,7 @@ export class CompanionRuntime {
           ? { targetDeviceId: this.targetDeviceId }
           : {}),
         ...(this.hermes ? { hermes: this.hermes } : {}),
+        ...(this.remoteInbox ? { remoteInbox: this.remoteInbox } : {}),
         statusText: () => this.telegramStatus()
       });
     }
@@ -354,6 +401,77 @@ export class CompanionRuntime {
     }
   }
 
+  private async deliverLeasedRemoteVoice(
+    session: FirmwareSessionInfo,
+    control: FirmwareVoiceControl
+  ): Promise<void> {
+    if (!this.remoteInbox || !session.deviceId) return;
+
+    const item = await this.remoteInbox.claimLeasedVoice(
+      session.deviceId
+    );
+    if (!item) return;
+
+    if (item.replyChatId !== undefined) {
+      this.telegram?.expectReply(
+        session.sessionId,
+        item.replyChatId
+      );
+    }
+
+    try {
+      await control.sendText(item.prompt);
+      console.log(
+        "[remote] delivered " +
+          item.mode +
+          " request " +
+          item.id +
+          " to device " +
+          session.deviceId
+      );
+    } catch (error) {
+      this.telegram?.cancelExpectedReply(session.sessionId);
+      await this.remoteInbox.requeueVoice(item);
+      console.error(
+        "[remote] failed to inject queued voice request",
+        error
+      );
+    }
+  }
+
+  private async deliverOrQueueNotification(input: {
+    text: string;
+    emotion: "neutral" | "happy" | "shy" | "sad" | "annoyed" | "surprised";
+    sound: string;
+    callId: string;
+  }): Promise<boolean> {
+    const result = await this.voiceControls.executeTool(
+      {
+        name: "device_companion",
+        arguments: {
+          op: "notify",
+          text: input.text.slice(0, 220),
+          emotion: input.emotion,
+          sound: input.sound
+        },
+        callId: input.callId
+      },
+      this.targetDeviceId
+    );
+    if (result?.ok) return true;
+
+    if (this.remoteInbox && this.targetDeviceId) {
+      await this.remoteInbox.enqueueNotification({
+        deviceId: this.targetDeviceId,
+        text: input.text.slice(0, 220),
+        emotion: input.emotion,
+        sound: input.sound
+      });
+      return true;
+    }
+    return false;
+  }
+
   private createBriefing(deviceId?: string): BriefingService {
     return new BriefingService({
       ...(this.weather ? { weather: this.weather } : {}),
@@ -369,21 +487,14 @@ export class CompanionRuntime {
     const briefing = this.createBriefing(this.targetDeviceId);
     const snapshot = await briefing.snapshot();
     const summary = briefing.describeId(snapshot);
-    const toolResult = await this.voiceControls.executeTool(
-      {
-        name: "device_companion",
-        arguments: {
-          op: "notify",
-          text: summary.slice(0, 220),
-          emotion: "happy",
-          sound: "builtin:popup"
-        },
-        callId: "daily-briefing-" + Date.now()
-      },
-      this.targetDeviceId
-    );
+    const notified = await this.deliverOrQueueNotification({
+      text: summary,
+      emotion: "happy",
+      sound: "builtin:popup",
+      callId: "daily-briefing-" + Date.now()
+    });
 
-    if (!toolResult?.ok) {
+    if (!notified) {
       console.warn("[briefing] device notification unavailable");
     }
 
@@ -416,25 +527,18 @@ export class CompanionRuntime {
           ? snapshot.providerId + " sangat menipis." + remaining
           : snapshot.providerId + " mulai menipis." + remaining;
 
-    const result = await this.voiceControls.executeTool(
-      {
-        name: "device_companion",
-        arguments: {
-          op: "notify",
-          text: text.slice(0, 220),
-          emotion:
-            snapshot.level === "exhausted" ||
-            snapshot.level === "critical"
-              ? "sad"
-              : "surprised",
-          sound: "builtin:exclamation"
-        },
-        callId:
-          "budget-" + snapshot.providerId + "-" + snapshot.level
-      },
-      this.targetDeviceId
-    );
-    if (!result?.ok) {
+    const notified = await this.deliverOrQueueNotification({
+      text,
+      emotion:
+        snapshot.level === "exhausted" ||
+        snapshot.level === "critical"
+          ? "sad"
+          : "surprised",
+      sound: "builtin:exclamation",
+      callId:
+        "budget-" + snapshot.providerId + "-" + snapshot.level
+    });
+    if (!notified) {
       console.warn("[budget] device warning unavailable", snapshot.providerId);
     }
 
@@ -467,28 +571,21 @@ export class CompanionRuntime {
       snapshot.limitTokens.toLocaleString("id-ID") +
       " token.";
 
-    const result = await this.voiceControls.executeTool(
-      {
-        name: "device_companion",
-        arguments: {
-          op: "notify",
-          text: detail.slice(0, 220),
-          emotion:
-            snapshot.level === "exhausted" ||
-            snapshot.level === "critical"
-              ? "sad"
-              : "surprised",
-          sound: "builtin:exclamation"
-        },
-        callId:
-          "voice-token-budget-" +
-          snapshot.localDate +
-          "-" +
-          snapshot.level
-      },
-      this.targetDeviceId
-    );
-    if (!result?.ok) {
+    const notified = await this.deliverOrQueueNotification({
+      text: detail,
+      emotion:
+        snapshot.level === "exhausted" ||
+        snapshot.level === "critical"
+          ? "sad"
+          : "surprised",
+      sound: "builtin:exclamation",
+      callId:
+        "voice-token-budget-" +
+        snapshot.localDate +
+        "-" +
+        snapshot.level
+    });
+    if (!notified) {
       console.warn("[budget] local voice-token warning unavailable");
     }
   }
@@ -500,7 +597,12 @@ export class CompanionRuntime {
     return (
       (target
         ? "Nara online. "
-        : "Nara belum punya sesi suara aktif. ") +
+        : "Nara sedang idle. ") +
+      (this.remoteInbox
+        ? "Inbox tertunda " +
+          this.remoteInbox.pendingCount(this.targetDeviceId) +
+          ". "
+        : "") +
       briefing.describeId(snapshot)
     ).slice(0, 4096);
   }

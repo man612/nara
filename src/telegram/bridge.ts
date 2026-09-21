@@ -1,5 +1,6 @@
 import type { FirmwareVoiceControlRegistry } from "../device/voice-control.js";
 import type { HermesAgentClient } from "../agents/hermes.js";
+import type { RemoteInbox } from "../remote/inbox.js";
 
 type TelegramUser = {
   id?: number;
@@ -33,6 +34,7 @@ export type TelegramBridgeOptions = {
   voiceControls: FirmwareVoiceControlRegistry;
   targetDeviceId?: string;
   hermes?: HermesAgentClient;
+  remoteInbox?: RemoteInbox;
   statusText?: () => Promise<string> | string;
   fetchImpl?: typeof fetch;
   pollTimeoutSeconds?: number;
@@ -59,6 +61,7 @@ export class TelegramBridge {
   private readonly fetchImpl: typeof fetch;
   private readonly allowed = new Set<number>();
   private readonly pendingChats: number[] = [];
+  private readonly pendingSessionChats = new Map<string, number>();
   private offset = 0;
   private stopped = false;
   private polling: Promise<void> | undefined;
@@ -92,11 +95,27 @@ export class TelegramBridge {
     await this.polling;
   }
 
+  expectReply(sessionId: string, chatId: number): void {
+    this.pendingSessionChats.set(sessionId, chatId);
+  }
+
+  cancelExpectedReply(sessionId: string): void {
+    this.pendingSessionChats.delete(sessionId);
+  }
+
   async handleOutputTranscript(
+    sessionId: string,
     text: string,
     final: boolean
   ): Promise<void> {
     if (!final || !text.trim()) return;
+    const sessionChat = this.pendingSessionChats.get(sessionId);
+    if (sessionChat !== undefined) {
+      this.pendingSessionChats.delete(sessionId);
+      await this.sendMessage(sessionChat, text.trim());
+      return;
+    }
+
     const chatId = this.pendingChats.shift();
     if (chatId === undefined) return;
     await this.sendMessage(chatId, text.trim());
@@ -176,7 +195,7 @@ export class TelegramBridge {
           chatId,
           [
             "Nara Telegram bridge ready.",
-            "/ask <pesan> - ngobrol lewat Nara",
+            "/ask <pesan> - ngobrol lewat Nara, termasuk saat idle",
             "/say <pesan> - minta Nara membacakan pesan",
             "/notify <pesan> - notifikasi lokal tanpa AI",
             "/agent <tugas> - delegasikan tugas panjang ke Hermes",
@@ -212,11 +231,29 @@ export class TelegramBridge {
           },
           this.options.targetDeviceId
         );
+        if (result?.ok) {
+          await this.sendMessage(chatId, "Notifikasi dikirim ke Nara.");
+          return;
+        }
+        if (
+          this.options.remoteInbox &&
+          this.options.targetDeviceId
+        ) {
+          await this.options.remoteInbox.enqueueNotification({
+            deviceId: this.options.targetDeviceId,
+            text: argument,
+            emotion: "happy",
+            sound: "builtin:popup"
+          });
+          await this.sendMessage(
+            chatId,
+            "Nara sedang idle. Notifikasi diantrikan dan akan muncul saat perangkat mengambil inbox."
+          );
+          return;
+        }
         await this.sendMessage(
           chatId,
-          result?.ok
-            ? "Notifikasi dikirim ke Nara."
-            : "Nara belum online atau fitur notifikasi belum tersedia."
+          "Nara belum online atau idle delivery belum dikonfigurasi."
         );
         return;
       }
@@ -226,16 +263,35 @@ export class TelegramBridge {
           await this.sendMessage(chatId, "Tulis pesan setelah /say.");
           return;
         }
-        const delivered = await this.options.voiceControls.sendText(
+        const prompt =
           "Read this message to the person near the device exactly and briefly, without adding new facts: " +
-            JSON.stringify(argument),
+          JSON.stringify(argument);
+        const delivered = await this.options.voiceControls.sendText(
+          prompt,
           this.options.targetDeviceId
         );
+        if (delivered) {
+          await this.sendMessage(chatId, "Pesan dikirim ke suara Nara.");
+          return;
+        }
+        if (
+          this.options.remoteInbox &&
+          this.options.targetDeviceId
+        ) {
+          await this.options.remoteInbox.enqueueVoice({
+            deviceId: this.options.targetDeviceId,
+            mode: "say",
+            prompt
+          });
+          await this.sendMessage(
+            chatId,
+            "Nara sedang idle. Pesan suara diantrikan; AI baru dinyalakan ketika perangkat mengambilnya."
+          );
+          return;
+        }
         await this.sendMessage(
           chatId,
-          delivered
-            ? "Pesan dikirim ke suara Nara."
-            : "Nara belum punya sesi suara aktif."
+          "Nara belum punya sesi suara aktif atau target perangkat idle belum dikonfigurasi."
         );
         return;
       }
@@ -266,15 +322,37 @@ export class TelegramBridge {
 
       case "ask": {
         if (!argument) return;
-        const delivered = await this.options.voiceControls.sendText(
-          argument,
+        const active = this.options.voiceControls.resolve(
           this.options.targetDeviceId
         );
-        if (!delivered) {
-          await this.sendMessage(chatId, "Nara belum punya sesi suara aktif.");
+        if (active) {
+          await active.control.sendText(argument);
+          this.pendingSessionChats.set(
+            active.session.sessionId,
+            chatId
+          );
           return;
         }
-        this.pendingChats.push(chatId);
+        if (
+          this.options.remoteInbox &&
+          this.options.targetDeviceId
+        ) {
+          await this.options.remoteInbox.enqueueVoice({
+            deviceId: this.options.targetDeviceId,
+            mode: "ask",
+            prompt: argument,
+            replyChatId: chatId
+          });
+          await this.sendMessage(
+            chatId,
+            "Nara sedang idle. Pertanyaan diantrikan; perangkat akan membangunkan voice hanya untuk menjawab ini."
+          );
+          return;
+        }
+        await this.sendMessage(
+          chatId,
+          "Nara belum punya sesi suara aktif atau target perangkat idle belum dikonfigurasi."
+        );
         return;
       }
 
