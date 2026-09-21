@@ -111,9 +111,9 @@ function headerString(
   return value;
 }
 
-function isGatewayDeviceAuthorized(
+export function isGatewayDeviceAuthorized(
   request: IncomingMessage,
-  options: GatewayOptions
+  options: Pick<GatewayOptions, "deviceToken" | "deviceRegistry">
 ): boolean {
   const authorization = request.headers.authorization;
   const deviceId = headerString(request.headers["device-id"]);
