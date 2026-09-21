@@ -69,6 +69,7 @@ class FakeCodecFactory implements AudioCodecFactory {
 class FakeVoiceSession implements VoiceSession {
   readonly handlers = new Set<VoiceEventHandler>();
   readonly input: AudioChunk[] = [];
+  readonly toolResults: unknown[] = [];
   interruptCalls = 0;
   streamEndCalls = 0;
   closed = false;
@@ -82,6 +83,10 @@ class FakeVoiceSession implements VoiceSession {
 
   async endAudioStream(): Promise<void> {
     this.streamEndCalls += 1;
+  }
+
+  async sendToolResult(result: unknown): Promise<void> {
+    this.toolResults.push(result);
   }
 
   async interrupt(): Promise<void> {
