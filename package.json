@@ -3,7 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Provider-agnostic core for physical AI companions.",
+  "description": "Source-available runtime for expressive physical AI companions: realtime voice, memory, actions, identity, connectivity, and offline intelligence.",
+  "author": "man612",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/man612/nara.git"
+  },
+  "homepage": "https://github.com/man612/nara#readme",
+  "keywords": [
+    "physical-ai",
+    "voice-ai",
+    "realtime-audio",
+    "ai-companion",
+    "edge-ai",
+    "esp32",
+    "source-available"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.build.json",
