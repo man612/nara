@@ -104,6 +104,7 @@ export class HumanCredentialRegistry {
   private readonly filePath: string | undefined;
   private readonly now: () => number;
   private writeChain: Promise<void> = Promise.resolve();
+  private storageFailure: Error | undefined;
 
   private constructor(options: HumanCredentialRegistryOptions = {}) {
     this.filePath = options.filePath;
@@ -118,10 +119,15 @@ export class HumanCredentialRegistry {
     return registry;
   }
 
+  isHealthy(): boolean {
+    return this.storageFailure === undefined;
+  }
+
   async issue(input: {
     personId: string;
     accountId?: string;
   }): Promise<IssuedHumanCredential> {
+    this.assertStorageHealthy();
     requireText(input.personId, "personId");
     if (input.accountId !== undefined) {
       requireText(input.accountId, "accountId");
@@ -149,6 +155,7 @@ export class HumanCredentialRegistry {
   }
 
   async revoke(credentialId: string): Promise<void> {
+    this.assertStorageHealthy();
     requireText(credentialId, "credentialId");
     const record = this.credentials.get(credentialId);
     if (!record) {
@@ -172,6 +179,7 @@ export class HumanCredentialRegistry {
   }
 
   verifyCredential(credential: string): HumanViewerIdentity | undefined {
+    this.assertStorageHealthy();
     if (!credential) return undefined;
     for (const record of this.credentials.values()) {
       if (
@@ -191,6 +199,7 @@ export class HumanCredentialRegistry {
     credential: string,
     options: { ttlMs?: number } = {}
   ): { token: string; expiresAt: string; viewer: HumanViewerIdentity } {
+    this.assertStorageHealthy();
     const viewer = this.verifyCredential(credential);
     if (!viewer) {
       throw new Error("Invalid or revoked human credential");
@@ -202,6 +211,7 @@ export class HumanCredentialRegistry {
     viewer: HumanViewerIdentity,
     options: { ttlMs?: number } = {}
   ): { token: string; expiresAt: string; viewer: HumanViewerIdentity } {
+    this.assertStorageHealthy();
     requireText(viewer.personId, "personId");
     if (viewer.accountId !== undefined) {
       requireText(viewer.accountId, "accountId");
@@ -233,6 +243,7 @@ export class HumanCredentialRegistry {
   }
 
   resolveSession(token: string): HumanViewerIdentity | undefined {
+    this.assertStorageHealthy();
     if (!token) return undefined;
     this.pruneSessions();
     const session = this.sessions.get(hashSecret(token));
@@ -281,25 +292,41 @@ export class HumanCredentialRegistry {
     }
   }
 
+  private assertStorageHealthy(): void {
+    if (!this.storageFailure) return;
+    throw new Error(
+      `Human credential storage is unavailable: ${this.storageFailure.message}`
+    );
+  }
+
   private persist(): Promise<void> {
+    this.assertStorageHealthy();
     if (!this.filePath) return Promise.resolve();
 
-    this.writeChain = this.writeChain.then(async () => {
-      const snapshot: HumanCredentialSnapshot = {
-        version: 1,
-        credentials: [...this.credentials.values()].map((record) =>
-          structuredClone(record)
-        )
-      };
-      await mkdir(dirname(this.filePath!), { recursive: true });
-      const tempPath = `${this.filePath}.${process.pid}.tmp`;
-      await writeFile(
-        tempPath,
-        JSON.stringify(snapshot, null, 2) + "\n",
-        { mode: 0o600 }
-      );
-      await rename(tempPath, this.filePath!);
-    });
+    this.writeChain = this.writeChain
+      .then(async () => {
+        const snapshot: HumanCredentialSnapshot = {
+          version: 1,
+          credentials: [...this.credentials.values()].map((record) =>
+            structuredClone(record)
+          )
+        };
+        await mkdir(dirname(this.filePath!), { recursive: true });
+        const tempPath = `${this.filePath}.${process.pid}.tmp`;
+        await writeFile(
+          tempPath,
+          JSON.stringify(snapshot, null, 2) + "\n",
+          { mode: 0o600 }
+        );
+        await rename(tempPath, this.filePath!);
+      })
+      .catch((error: unknown) => {
+        this.storageFailure =
+          error instanceof Error
+            ? error
+            : new Error("Unknown human credential persistence failure");
+        throw this.storageFailure;
+      });
     return this.writeChain;
   }
 }
