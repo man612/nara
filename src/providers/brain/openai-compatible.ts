@@ -1,7 +1,9 @@
 import type {
+  BrainMessage,
   BrainProvider,
   BrainRequest,
   BrainResponse,
+  BrainToolCall,
   ProviderUsage
 } from "../../contracts/providers.js";
 
@@ -65,6 +67,82 @@ export function normalizeOpenAICompatibleUsage(value: unknown): ProviderUsage | 
   return Object.keys(normalized).length > 0 ? normalized : undefined;
 }
 
+function serializeBrainMessage(message: BrainMessage): Record<string, unknown> {
+  if (message.role === "assistant") {
+    return {
+      role: "assistant",
+      content: message.content || null,
+      ...(message.toolCalls && message.toolCalls.length > 0
+        ? {
+            tool_calls: message.toolCalls.map((call) => ({
+              id: call.id,
+              type: "function",
+              function: {
+                name: call.name,
+                arguments:
+                  typeof call.arguments === "string"
+                    ? call.arguments
+                    : JSON.stringify(call.arguments ?? {})
+              }
+            }))
+          }
+        : {})
+    };
+  }
+
+  if (message.role === "tool") {
+    return {
+      role: "tool",
+      content: message.content,
+      tool_call_id: message.toolCallId,
+      name: message.name
+    };
+  }
+
+  return {
+    role: message.role,
+    content: message.content
+  };
+}
+
+function normalizeToolCalls(value: unknown): BrainToolCall[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const calls: BrainToolCall[] = [];
+  for (const candidate of value) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const record = candidate as Record<string, unknown>;
+    const fn = record.function;
+    if (!fn || typeof fn !== "object") continue;
+    const functionRecord = fn as Record<string, unknown>;
+    if (
+      typeof record.id !== "string" ||
+      typeof functionRecord.name !== "string"
+    ) {
+      continue;
+    }
+
+    let args: unknown = {};
+    if (typeof functionRecord.arguments === "string") {
+      try {
+        args = JSON.parse(functionRecord.arguments);
+      } catch {
+        args = functionRecord.arguments;
+      }
+    } else if (functionRecord.arguments !== undefined) {
+      args = functionRecord.arguments;
+    }
+
+    calls.push({
+      id: record.id,
+      name: functionRecord.name,
+      arguments: args
+    });
+  }
+
+  return calls.length > 0 ? calls : undefined;
+}
+
 export class OpenAICompatibleBrain implements BrainProvider {
   readonly id: string;
 
@@ -74,6 +152,13 @@ export class OpenAICompatibleBrain implements BrainProvider {
 
   async complete(request: BrainRequest): Promise<BrainResponse> {
     const baseUrl = this.config.baseUrl.replace(/\/$/, "");
+    const timeoutSignal = AbortSignal.timeout(
+      this.config.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+    );
+    const signal = request.signal
+      ? AbortSignal.any([request.signal, timeoutSignal])
+      : timeoutSignal;
+
     const response = await (this.config.fetchImpl ?? fetch)(
       `${baseUrl}/chat/completions`,
       {
@@ -86,12 +171,10 @@ export class OpenAICompatibleBrain implements BrainProvider {
         },
         body: JSON.stringify({
           model: this.config.model,
-          messages: request.messages,
+          messages: request.messages.map(serializeBrainMessage),
           ...(request.tools ? { tools: request.tools } : {})
         }),
-        signal: AbortSignal.timeout(
-          this.config.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
-        )
+        signal
       }
     );
 
@@ -103,7 +186,7 @@ export class OpenAICompatibleBrain implements BrainProvider {
       choices?: Array<{
         message?: {
           content?: string | null;
-          tool_calls?: unknown[];
+          tool_calls?: unknown;
         };
       }>;
       usage?: unknown;
@@ -111,11 +194,12 @@ export class OpenAICompatibleBrain implements BrainProvider {
 
     const message = data.choices?.[0]?.message;
     const usage = normalizeOpenAICompatibleUsage(data.usage);
+    const toolCalls = normalizeToolCalls(message?.tool_calls);
 
     return {
       text: message?.content ?? "",
       providerId: this.id,
-      ...(message?.tool_calls ? { toolCalls: message.tool_calls } : {}),
+      ...(toolCalls ? { toolCalls } : {}),
       ...(usage ? { usage } : {})
     };
   }
