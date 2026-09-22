@@ -205,6 +205,75 @@ describe("ChainedVoiceProvider", () => {
     }
   });
 
+  it("propagates tool cancellation when an active turn is interrupted", async () => {
+    const stt = new FakeStt();
+    const brain: BrainProvider = {
+      id: "tool-brain",
+      async complete() {
+        return {
+          text: "",
+          toolCalls: [
+            {
+              id: "slow-tool",
+              name: "web_search",
+              arguments: { query: "latest" }
+            }
+          ]
+        };
+      }
+    };
+    const tts = new FakeTts();
+    const session = await new ChainedVoiceProvider("chained", {
+      stt,
+      brain,
+      tts
+    }).connect({
+      tools: [
+        {
+          name: "web_search",
+          description: "Search the web.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: { type: "string" }
+            },
+            required: ["query"]
+          },
+          effect: "read",
+          behavior: "blocking"
+        }
+      ]
+    });
+    const events: VoiceSessionEvent[] = [];
+    let resolveToolCall!: () => void;
+    const toolCalled = new Promise<void>((resolve) => {
+      resolveToolCall = resolve;
+    });
+    const unsubscribe = session.subscribe((event) => {
+      events.push(event);
+      if (event.type === "tool.call") {
+        resolveToolCall();
+      }
+    });
+
+    try {
+      await session.sendText?.("cari");
+      await Promise.race([toolCalled, timeout()]);
+      await session.interrupt();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(events).toContainEqual({
+        type: "tool.cancel",
+        callIds: ["slow-tool"]
+      });
+      expect(events).toContainEqual({ type: "interrupted" });
+      expect(tts.texts).toHaveLength(0);
+    } finally {
+      unsubscribe();
+      await session.close();
+    }
+  });
+
   it("aborts an in-flight chained turn on interruption", async () => {
     const stt: SpeechToTextProvider = {
       id: "slow-stt",
