@@ -1,6 +1,6 @@
 # Offline runtime strategy
 
-Status: accepted product direction; implementation is staged.
+Status: accepted product direction; core isolated utilities and the first recipient-safe offline capsule/minigame path are implemented, while richer offline UX and local voice remain staged.
 
 Last reviewed: 2026-09-21
 
@@ -16,12 +16,16 @@ Already implemented:
 - CST816S touch can drive local gaze and classify tap, double-tap, hold and stroke/pet gestures;
 - PCF85063 can restore the system clock and receive online clock correction;
 - timer and daily-alarm state persist locally;
-- while offline, hold can show local time and double-tap can start a configurable quick timer.
+- while offline, hold can show local time and double-tap can start a configurable quick timer;
+- a permission-filtered recipient-safe personal capsule can be compiled/exported by the gateway and parsed/searched deterministically on-device;
+- local stroke/pet interaction can cycle through authorized capsule facts;
+- the token-free Nara Says minigame runs from local touch/IMU input.
 
 Still staged:
 
-- richer local navigation/status UI around those utility primitives;
-- permission-filtered offline personal capsule and deterministic local search;
+- richer local navigation/status UI around those utility/capsule primitives;
+- local notes/messages/media beyond the current capsule;
+- explicit reconnect refresh/sync UX;
 - ESP32-created secure SoftAP peer UI;
 - local-network STT/LLM/TTS.
 
@@ -437,12 +441,20 @@ No microSD is required.
 
 ### O2 — offline personal capsule
 
+Implemented foundation:
+
 - schema/compiler on Nara backend;
-- permission-filter before capsule creation;
-- revision/signature;
-- local read/search;
-- notes/messages;
+- permission filtering before capsule creation;
+- authenticated export;
+- bounded local parse/read/search on firmware;
+- local stroke/pet browsing of authorized facts.
+
+Remaining enrichment/hardening:
+
+- production revision/authenticity/signature policy;
+- notes/messages beyond the current fact capsule;
 - pre-generated/recorded audio;
+- explicit reconnect refresh/sync UX;
 - microSD support for larger media.
 
 ### O3 — direct phone peer

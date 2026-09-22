@@ -52,7 +52,9 @@ The current file adapter is a replaceable first implementation, not permission t
 - `src/device/firmware-wire.ts` — physical firmware hello/auth helpers and WebSocket Opus v1/v2/v3 framing.
 - `src/device/audio-pacer.ts` — bounded 60 ms playback pacing with a short prebuffer.
 - `src/device/voice-bridge.ts` — per-device firmware ↔ codec ↔ VoiceSession lifecycle bridge.
-- `src/device/mcp-tools.ts` — compact validated aliases over firmware MCP, including device status/volume and local-reflex customization.
+- `src/device/mcp-tools.ts` — compact validated aliases over firmware MCP, including device status/volume, local-reflex customization and companion controls.
+- `src/device/voice-control.ts` — registry for active physical voice sessions used by remote delivery and scheduled companion services.
+- `src/remote/inbox.ts` / `src/remote/http.ts` — durable per-device idle-delivery queue plus authenticated firmware poll/ack edge.
 - `src/phone/protocol.ts` — bounded PCM16 framing for the authenticated browser phone-audio path.
 - `src/phone/voice-bridge.ts` — phone/browser ↔ provider-neutral VoiceSession bridge.
 - `phone-bridge/index.html` — browser mic/playback client; phone OS routing may use a connected TWS.
@@ -86,6 +88,12 @@ The current file adapter is a replaceable first implementation, not permission t
 - `src/providers/brain/fallback.ts` — ordered fallback chain.
 - `src/providers/voice/gemini-live.ts` — raw Gemini Live v1beta provider adapter, usage normalization and session resumption.
 - `src/providers/voice/` — other realtime/chained voice adapters belong here.
+- `src/agents/hermes.ts` — optional asynchronous Hermes Runs API delegation.
+- `src/briefing/` — deterministic weather/report composition and daily scheduling.
+- `src/budget/` — direct provider balance checks and local daily realtime-token guard.
+- `src/telegram/bridge.ts` — allowlisted Telegram long-poll bridge and remote companion routing.
+- `src/diagnostics/network-http.ts` — bounded authenticated network-test endpoints.
+- `src/telemetry/voice-latency.ts` — bounded measured voice-response latency history.
 
 ## Device development
 

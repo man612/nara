@@ -317,3 +317,89 @@ References:
 - https://github.com/esphome/home-assistant-voice-pe/blob/dev/home-assistant-voice.factory.yaml
 - https://github.com/project-chip/connectedhomeip
 - https://github.com/espressif/esp-matter
+
+
+## Telegram idle delivery and durable device inbox
+
+Purpose: allow a trusted remote sender to reach a physical Nara even when the
+realtime voice WebSocket is intentionally closed to save tokens and power.
+
+Useful findings:
+
+- Telegram Bot API supports long polling through `getUpdates`; a positive
+  timeout is recommended for long polling rather than repeated short polling;
+- Telegram updates are not a durable device-delivery queue after the bot has
+  consumed them, and pending updates are retained for no longer than roughly
+  24 hours;
+- Nara firmware already opens its realtime WebSocket only when audio is needed,
+  so keeping a Gemini/realtime session alive merely for remote messages would
+  undo an existing cost-saving property.
+
+Decision:
+
+The gateway consumes Telegram through allowlisted long polling, then owns
+delivery reliability in a bounded file-backed per-device inbox. Idle firmware
+polling returns local notification payloads or a compact voice-wake signal.
+Queued ask/say prompts remain server-side. A voice wake opens a one-shot
+realtime session without microphone listening and closes after TTS. Queue
+items have TTL/lease/retry semantics so stale work expires and temporary
+delivery failures can retry.
+
+References:
+
+- https://core.telegram.org/bots/api
+- https://core.telegram.org/bots/faq
+
+
+## ESP32-S3 idle polling and Wi-Fi power tradeoffs
+
+Purpose: make remote idle delivery useful without claiming that periodic Wi-Fi
+checks are free on battery.
+
+Useful findings:
+
+- ESP-IDF documents modem-sleep modes where a station can remain associated
+  while RF/PHY/baseband sleep between required receive windows;
+- minimum-modem and maximum-modem power-save modes trade receive latency and
+  responsiveness for lower power;
+- listen interval/DTIM behavior and the real access point materially affect
+  power and wake latency.
+
+Decision:
+
+Do not hold the realtime AI/audio WebSocket open while the companion is idle.
+Use a small authenticated HTTP poll instead, with software defaults of 15
+seconds normally, 60 seconds in battery saver and 120 seconds at critical
+battery. These are conservative product defaults, not measured battery-life
+claims; final intervals must be tuned from hardware-in-the-loop current,
+latency and router/hotspot measurements.
+
+References:
+
+- https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-guides/wifi-driver/wifi-performance-and-power-save.html
+- https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/low-power-mode/low-power-mode-wifi.html
+
+
+## Hermes Runs API
+
+Purpose: delegate long browser/research/multi-step work without placing an
+agent framework in Nara's realtime microphone/speaker critical path.
+
+Useful findings:
+
+- Hermes Agent exposes asynchronous Runs endpoints for start/status/stop;
+- API-server deployments support bearer authentication and idempotent run
+  creation;
+- profile-prefixed API routes allow independent Hermes profiles.
+
+Decision:
+
+Nara integrates Hermes as an optional Runs API tool. `HERMES_BASE_URL` is the
+server root and Nara appends the Runs paths itself. A managed SumoPod Hermes
+service, a generic VPS or a self-hosted Hermes server can therefore be swapped
+by configuration. Simple realtime turns stay on the voice path; Hermes is for
+work that benefits from agent/browser/tool execution.
+
+Reference:
+
+- https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/api-server.md

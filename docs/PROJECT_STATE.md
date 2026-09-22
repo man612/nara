@@ -35,7 +35,20 @@ Real names, private biography, relationship details, credentials, recordings and
 - provider-neutral person directory and conservative speaker-identity decision service;
 - runtime speaker recognition integration that remains personalization evidence rather than private-memory authorization;
 - file-backed personal memory with validation, subject/viewer access policy, sharing, expiry, bounded recall, edit/delete and fail-closed persistence;
-- content/context filtering tests proving unauthorized personal facts do not reach the model.
+- content/context filtering tests proving unauthorized personal facts do not reach the model;
+- privacy-filtered offline personal-capsule compiler/export with recipient/viewer enforcement;
+- deterministic Open-Meteo weather summaries and scheduled daily briefings;
+- direct DeepSeek/OpenRouter balance/key-limit monitoring without an LLM call;
+- local daily soft budget for provider-reported realtime voice tokens;
+- measured voice latency telemetry with bounded p50/p95 summaries;
+- optional Hermes Runs API delegation for long agent work;
+- allowlisted Telegram bridge with ask/say/notify/status/agent commands;
+- durable per-device remote inbox with TTL, leasing, retry and authenticated device poll/ack;
+- idle remote delivery that keeps queued voice prompts server-side and does not require an always-on realtime model session;
+- bounded authenticated network-diagnostic endpoints shared with firmware;
+- WebAuthn/passkey registration and authentication with server-bound challenges, RP/origin checks and real signature verification;
+- short-lived authenticated human viewer sessions plus expiring per-device trusted viewer grants;
+- dynamic private-memory viewer resolution on every memory tool call, so expired/revoked physical-device grants fail back to guest.
 
 ### Firmware / Waveshare 1.85B
 
@@ -59,7 +72,13 @@ Real names, private biography, relationship details, credentials, recordings and
 - persistent local timer and daily-alarm state;
 - offline hold-to-show-time and configurable double-tap quick timer behavior;
 - face gaze target API prepared for external local vision;
-- firmware OTA verification including expected SHA-256/size and device credential reuse.
+- firmware OTA verification including expected SHA-256/size and device credential reuse;
+- recipient-safe offline personal-capsule parsing and deterministic local lookup;
+- isolated stroke/pet cycling through offline capsule facts;
+- token-free Nara Says physical minigame using tap/double-tap/hold/stroke/shake;
+- compact local notification/game/network-diagnostic control surface;
+- bounded gateway speed test with ping, download/upload Mbps and MB/s explanation support;
+- battery-aware idle remote-inbox polling and one-shot remote voice wake without microphone streaming.
 
 ### Optional external local vision
 
@@ -93,11 +112,11 @@ This proves **which Nara device** connected. It does not prove which human is cu
 
 Speaker recognition is deliberately not root authentication.
 
-Current realtime personal-memory tools bind the viewer server-side to `person:guest`. Therefore realtime speech can retrieve only facts shareable with a guest/public viewer.
+Realtime speech does not infer private-memory privilege from the speaker's voice. A physical device remains guest/public-scoped unless a strong authenticated human explicitly grants that device a short-lived trusted viewer role.
 
-A strong phone/account/passkey or explicit physical approval signal is still required before trusted/private personal-memory privilege can be bound to a live session.
+WebAuthn/passkey registration and authentication are implemented. Successful passkey authentication mints the existing short-lived human viewer session, and that authenticated human can unlock/relock a physical Nara device with an expiring viewer grant. Memory tools resolve the grant again on every call, so expiry or revocation downgrades the same live voice session back to guest.
 
-The phone-audio bridge token authorizes that transport only. It also does not automatically grant trusted/private personal-memory access.
+The phone-audio bridge transport credential remains separate from human authorization. Possessing the phone transport token alone does not grant trusted/private personal-memory access.
 
 ## Connectivity state
 
@@ -109,6 +128,8 @@ The runtime connectivity vocabulary remains:
 - `isolated`.
 
 Phone hotspot is ordinary saved Wi-Fi station connectivity. The firmware can now remain useful/alive when saved Wi-Fi is absent and recover automatically when it returns.
+
+When Internet/gateway access exists but the realtime voice WebSocket is closed, the device can poll a small authenticated remote inbox. The default software cadence is 15 seconds, relaxed to 60 seconds in battery saver and 120 seconds at critical battery. Local notifications do not open AI voice. A queued ask/say request opens a one-shot voice channel without enabling microphone listening, then closes after TTS or a 90-second fail-safe. These intervals are software defaults, not measured battery-life claims.
 
 A browser phone-audio bridge exists for an online/reachable Nara Gateway, but the production **ESP32-created secure SoftAP peer UI** is still a separate staged feature. Do not confuse those two paths.
 
@@ -171,12 +192,14 @@ Already implemented:
 - local battery policy;
 - RTC-backed clock restore/synchronization;
 - persistent timer and daily alarm foundations;
-- touch shortcuts for local time and a configurable quick timer.
+- touch shortcuts for local time and a configurable quick timer;
+- recipient-safe offline personal capsule parsing and deterministic lookup;
+- token-free Nara Says physical minigame.
 
 Still staged:
 
 - richer local navigation/status UI around the utility foundation;
-- offline personal capsule compiler/storage/search;
+- local notes/messages/media beyond the implemented authorized capsule;
 - direct secure SoftAP peer UI on the ESP32;
 - local-network STT/LLM/TTS adapters;
 - production DPP / secure provisioning migration.
@@ -206,30 +229,26 @@ Validate on the real Waveshare board/final enclosure:
 
 CI proves code/build/protocol behavior; it cannot prove acoustics, radio conditions or physical sensor calibration.
 
-### P1 — strong human authorization
+### P1 — human authorization hardening
 
-Bind a strong authenticated human viewer to sessions before private/trusted memory is exposed.
+The passkey-first strong-viewer path is implemented: WebAuthn registration/authentication can mint short-lived human sessions, and an authenticated human can grant a physical Nara device temporary trusted/private viewer access. Speaker recognition is still only a confidence/personalization signal, and ambiguous or expired authorization fails down to guest.
 
-Required properties:
+Remaining hardening is product/operations work:
 
-- transport/device authentication is not enough;
-- speaker recognition remains a confidence signal only;
-- ambiguous identity fails down to guest, not up to owner/partner;
-- private-memory access uses the same existing viewer policy;
-- reset/transfer/revoke lifecycle remains explicit.
-
-Passkey-first account authentication remains the preferred product direction.
+- recovery and account-lifecycle UX beyond the legacy bootstrap/recovery credential;
+- production RP-ID/origin configuration and deployment checks;
+- reset/transfer/revoke UX around trusted viewer grants;
+- hardware-in-the-loop validation of the physical unlock/relock flow.
 
 ### P2 — isolated-device utility/capsule UX
 
-The RTC/timer/alarm firmware foundation is implemented. Expand the no-network
-product layer with:
+The RTC/timer/alarm foundation and first recipient-safe offline capsule are
+implemented, including bounded parsing, deterministic lookup and local
+stroke/pet browsing. Remaining product-layer work is optional enrichment:
 
-- richer local navigation/status around the implemented clock/timer/alarm;
-- permission-filtered offline personal capsule;
-- deterministic local lookup;
-- local notes/messages/media;
-- reconnect refresh/sync.
+- richer local navigation/status around clock/timer/alarm/capsule;
+- local notes/messages/media beyond the current capsule;
+- explicit reconnect refresh/sync UX.
 
 ### P3 — production commissioning/direct peer
 
@@ -244,15 +263,17 @@ Replace/contain the inherited open provisioning path before private direct-peer 
 
 ### P4 — optional ecosystem expansion
 
-Only after the privacy/physical product path is dependable:
+Hermes Runs API delegation is now implemented as an optional backend and does
+not sit in the realtime voice critical path. Remaining ecosystem expansion is
+non-blocking:
 
-- web/search adapter;
-- optional Hermes delegation;
+- dedicated web/search adapters beyond delegated Hermes research;
 - additional voice providers such as GPT Live/chained local voice;
-- reminders/calendar/home automation;
+- reminders/calendar/home automation connectors;
 - richer local-network STT/LLM/TTS.
 
-These are provider/features backlog, not blockers for validating the first physical Nara.
+These are optional provider/features backlog, not blockers for validating the
+first physical Nara.
 
 ## OTA and assets
 
@@ -287,9 +308,9 @@ For optional person-tracking gaze, the base Waveshare board has no camera. An ex
 
 Still intentionally open:
 
-- concrete passkey/account service and recovery UX;
+- production passkey recovery/account-lifecycle UX;
 - encryption-at-rest/key ownership for private memory;
-- first production offline-capsule format and removable-media protection;
+- encryption/authenticity policy for private capsule/assets at rest and on removable media;
 - exact local-network Indonesian STT/TTS/LLM stack;
 - final physical gesture thresholds;
 - whether two physical speech microphones plus playback reference should be exposed to the AFE after real capture analysis;

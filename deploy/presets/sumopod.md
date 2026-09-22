@@ -17,3 +17,35 @@ Required integration surface is intentionally small:
 - persistent storage for memory/config if enabled.
 
 Moving away from SumoPod should require deployment/config changes only, not firmware changes.
+
+
+## Current companion-service wiring
+
+A first deployment can keep Nara Gateway and Hermes independently replaceable.
+
+Suggested responsibilities:
+
+- Nara Gateway: physical WebSocket/Opus, memory/privacy policy, Telegram,
+  weather/briefings, budget/latency telemetry, OTA and the durable idle inbox;
+- Hermes on SumoPod: optional long-running browser/research/tool work through
+  the Runs API;
+- realtime voice provider: opened on demand rather than kept alive merely to
+  receive remote messages.
+
+Relevant environment variables:
+
+- `HERMES_BASE_URL`, `HERMES_API_KEY` and optional profile/model/provider;
+- `NARA_TELEGRAM_BOT_TOKEN`, `NARA_TELEGRAM_ALLOWED_USER_IDS` and
+  `NARA_COMPANION_DEVICE_ID`;
+- `NARA_REMOTE_INBOX_FILE` and optional TTL/lease/queue bounds;
+- optional weather coordinates/timezone and daily briefing schedule;
+- optional DeepSeek/OpenRouter keys for direct balance checks;
+- optional `NARA_VOICE_DAILY_TOKEN_BUDGET` for a local soft voice-usage cap.
+
+Persist the gateway `data/` directory if memory, device credentials, OTA
+channel policy, human credentials or the remote inbox are enabled. Never bake
+provider, Telegram, device or Hermes secrets into firmware images.
+
+The managed-service URL and key remain deployment configuration. Nara does not
+assume SumoPod-specific filesystem paths or make SumoPod a firmware
+dependency.

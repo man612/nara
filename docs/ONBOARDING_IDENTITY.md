@@ -1,6 +1,6 @@
 # First-use onboarding and identity
 
-Status: device-registry and one-time claim core implemented; phone/web account UX, passkeys and device-side claim delivery remain staged.
+Status: device registry, one-time claim core, passkey/WebAuthn human authentication and temporary physical-device viewer grants are implemented; production device-side claim delivery, secure commissioning and polished recovery/transfer UX remain staged.
 
 Last reviewed: 2026-09-21
 
@@ -237,7 +237,7 @@ Current firmware already provides useful primitives:
 
 Current server now supports a persistent runtime-private device registry and per-device credential enforcement at `/device`. Claim transactions are one-time, short-lived, bound to one device, require both account approval and a separate physical approval, and are consumed when a device credential is issued. Rotation/revocation and restart persistence are covered by tests.
 
-The public HTTP account/passkey claim experience is intentionally not exposed yet: account authentication must exist before an account-approval endpoint can be safe.
+A passkey/WebAuthn HTTP surface now exists for strong human registration and sign-in, including server-bound enrollment, origin/RP checks and short-lived viewer sessions. This is distinct from the still-staged public gift/device-claim UX: production account approval, device-side claim delivery and commissioning must remain capability-scoped rather than treating possession of a transport token or speaker match as account authorization.
 
 Firmware provisioning branding has been cleaned up to Nara. Production secure provisioning still needs to replace the inherited open hotspot path before shipping.
 
@@ -246,13 +246,13 @@ Firmware provisioning branding has been cleaned up to Nara. Production secure pr
 1. Define distinct account/person/device/relationship/role IDs. — partially implemented at the device/account boundary.
 2. Add a server-side device registry with unclaimed, claim-pending, active, and revoked states. — implemented.
 3. Add one-time claim transactions with high-entropy internal token, short human code, TTL and replay/device-binding protection. — implemented; external rate limiting belongs at the future HTTP claim edge.
-4. Add a web claim flow and QR payload. — next.
-5. Add passkey registration/sign-in plus recovery fallback. — next.
+4. Add a web claim flow and QR payload. — still staged for the gift/device-claim path.
+5. Add passkey registration/sign-in plus recovery fallback. — passkey registration/sign-in implemented; legacy bearer credential remains bootstrap/recovery while polished recovery UX is staged.
 6. Replace production use of the global gateway token with per-device credential issuance/revocation. — registry enforcement implemented; firmware claim delivery/provisioning remains.
-7. Add local physical approval to final claim. — server requirement implemented; firmware/UI signal remains.
-8. Connect claimed identity to viewer resolution and personal-memory access.
-9. Add optional voice enrollment after secure claim works.
-10. Add reset/unlink/transfer/credential-rotation tests.
+7. Add local physical approval to final claim. — server requirement implemented; firmware/UI claim signal remains.
+8. Connect authenticated identity to viewer resolution and personal-memory access. — implemented for passkey-authenticated phone sessions and expiring per-device trusted viewer grants.
+9. Add optional voice enrollment after secure claim works. — speaker-recognition runtime exists; user-facing enrollment/calibration UX remains.
+10. Add reset/unlink/transfer/credential-rotation tests and product UX. — credential rotation/revocation foundations are tested; full transfer/recovery UX remains.
 11. Benchmark DPP and secure BLE/SoftAP provisioning on the real Waveshare board.
 12. Polish the gift reveal dialogue/animation after the security flow is solid.
 
