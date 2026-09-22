@@ -28,8 +28,7 @@ describe("OpenAI-compatible brain tool turns", () => {
           {
             role: "tool",
             content: "{\"ok\":true}",
-            tool_call_id: "call-1",
-            name: "device_status"
+            tool_call_id: "call-1"
           }
         ]);
 
