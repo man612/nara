@@ -130,6 +130,7 @@ export class DeviceRegistry {
   private readonly now: () => number;
   private readonly filePath: string | undefined;
   private writeChain: Promise<void> = Promise.resolve();
+  private storageFailure: Error | undefined;
 
   private constructor(options: DeviceRegistryOptions = {}) {
     this.filePath = options.filePath;
@@ -142,16 +143,23 @@ export class DeviceRegistry {
     return registry;
   }
 
+  isHealthy(): boolean {
+    return this.storageFailure === undefined;
+  }
+
   getDevice(deviceId: string): DeviceRecord | undefined {
+    this.assertStorageHealthy();
     const record = this.devices.get(deviceId);
     return record ? structuredClone(record) : undefined;
   }
 
   getDeviceState(deviceId: string): DeviceLifecycleState | undefined {
+    this.assertStorageHealthy();
     return this.devices.get(deviceId)?.state;
   }
 
   listDevices(): DeviceRecord[] {
+    this.assertStorageHealthy();
     return [...this.devices.values()].map((record) =>
       structuredClone(record)
     );
@@ -161,6 +169,7 @@ export class DeviceRegistry {
     deviceId: string;
     clientId?: string;
   }): Promise<DeviceRecord> {
+    this.assertStorageHealthy();
     assertNonEmpty(input.deviceId, "deviceId");
     const existing = this.devices.get(input.deviceId);
     const now = new Date(this.now()).toISOString();
@@ -193,6 +202,7 @@ export class DeviceRegistry {
     deviceId: string,
     options: { ttlMs?: number } = {}
   ): Promise<ClaimStart> {
+    this.assertStorageHealthy();
     const device = this.devices.get(deviceId);
     if (!device) {
       throw new Error("Unknown device");
@@ -242,6 +252,7 @@ export class DeviceRegistry {
     accountId: string;
     role?: DeviceRole;
   }): Promise<void> {
+    this.assertStorageHealthy();
     assertNonEmpty(input.accountId, "accountId");
     const claim = await this.requireLiveClaim(input.claimId);
     if (!secureHashEqual(claim.claimTokenHash, input.claimToken)) {
@@ -258,6 +269,7 @@ export class DeviceRegistry {
     claimId: string;
     deviceId: string;
   }): Promise<void> {
+    this.assertStorageHealthy();
     const claim = await this.requireLiveClaim(input.claimId);
     if (claim.deviceId !== input.deviceId) {
       throw new Error("Claim is bound to a different device");
@@ -271,6 +283,7 @@ export class DeviceRegistry {
     claimId: string;
     deviceId: string;
   }): Promise<DeviceCredential> {
+    this.assertStorageHealthy();
     const claim = await this.requireLiveClaim(input.claimId);
     if (claim.deviceId !== input.deviceId) {
       throw new Error("Claim is bound to a different device");
@@ -305,6 +318,7 @@ export class DeviceRegistry {
   }
 
   verifyDeviceCredential(deviceId: string, credential: string): boolean {
+    this.assertStorageHealthy();
     const device = this.devices.get(deviceId);
     if (
       !device ||
@@ -318,6 +332,7 @@ export class DeviceRegistry {
   }
 
   async rotateCredential(deviceId: string): Promise<DeviceCredential> {
+    this.assertStorageHealthy();
     const device = this.devices.get(deviceId);
     if (!device || device.state !== "active") {
       throw new Error("Only an active device can rotate credentials");
@@ -337,6 +352,7 @@ export class DeviceRegistry {
   }
 
   async revokeDevice(deviceId: string): Promise<void> {
+    this.assertStorageHealthy();
     const device = this.devices.get(deviceId);
     if (!device) {
       throw new Error("Unknown device");
@@ -354,6 +370,7 @@ export class DeviceRegistry {
   }
 
   private async requireLiveClaim(claimId: string): Promise<ClaimRecord> {
+    this.assertStorageHealthy();
     const claim = this.claims.get(claimId);
     if (!claim) {
       throw new Error("Unknown or already-consumed claim");
@@ -397,7 +414,15 @@ export class DeviceRegistry {
     }
   }
 
+  private assertStorageHealthy(): void {
+    if (!this.storageFailure) return;
+    throw new Error(
+      `Device registry storage is unavailable: ${this.storageFailure.message}`
+    );
+  }
+
   private persist(): Promise<void> {
+    this.assertStorageHealthy();
     if (!this.filePath) {
       return Promise.resolve();
     }
@@ -409,15 +434,23 @@ export class DeviceRegistry {
       claims: Array.from(this.claims.values(), (claim) => structuredClone(claim))
     };
 
-    this.writeChain = this.writeChain.then(async () => {
-      await mkdir(dirname(target), { recursive: true });
-      const temporary = `${target}.tmp`;
-      await writeFile(temporary, JSON.stringify(snapshot, null, 2) + "\n", {
-        encoding: "utf8",
-        mode: 0o600
+    this.writeChain = this.writeChain
+      .then(async () => {
+        await mkdir(dirname(target), { recursive: true });
+        const temporary = `${target}.tmp`;
+        await writeFile(temporary, JSON.stringify(snapshot, null, 2) + "\n", {
+          encoding: "utf8",
+          mode: 0o600
+        });
+        await rename(temporary, target);
+      })
+      .catch((error: unknown) => {
+        this.storageFailure =
+          error instanceof Error
+            ? error
+            : new Error("Unknown device registry persistence failure");
+        throw this.storageFailure;
       });
-      await rename(temporary, target);
-    });
 
     return this.writeChain;
   }
