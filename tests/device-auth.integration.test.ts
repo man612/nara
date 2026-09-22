@@ -160,7 +160,7 @@ describe("per-device gateway authentication", () => {
           "device-id": "device-a",
           authorization: "Bearer legacy-global"
         }
-      } as IncomingMessage;
+      } as unknown as IncomingMessage;
 
       expect(
         isGatewayDeviceAuthorized(request, {
