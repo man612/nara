@@ -80,10 +80,15 @@ export class OpenAICompatibleStt implements SpeechToTextProvider {
     const baseUrl = this.config.baseUrl.trim().replace(/\/+$/, "");
     if (!baseUrl) throw new Error("STT base URL is required");
 
+    const wav = pcm16Wav(audio);
+    const wavBuffer = wav.buffer.slice(
+      wav.byteOffset,
+      wav.byteOffset + wav.byteLength
+    ) as ArrayBuffer;
     const form = new FormData();
     form.append(
       "file",
-      new Blob([pcm16Wav(audio)], { type: "audio/wav" }),
+      new Blob([wavBuffer], { type: "audio/wav" }),
       "nara-turn.wav"
     );
     form.append("model", this.config.model);
