@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { HumanCredentialRegistry } from "../src/identity/human-credentials.js";
 
@@ -54,6 +54,36 @@ describe("human credential registry", () => {
     expect(reopened.resolveSession(session.token)).toEqual({
       personId: "person:partner",
       accountId: "account:partner"
+    });
+  });
+
+  it("fails closed after persistence errors and recovers from the durable credential snapshot", async () => {
+    const { registry, filePath } = await tempRegistry();
+    const issued = await registry.issue({ personId: "person:partner" });
+
+    const directory = dirname(filePath);
+    const displaced = `${directory}-durable`;
+    await rename(directory, displaced);
+    await writeFile(directory, "blocker", "utf8");
+
+    try {
+      await expect(registry.revoke(issued.credentialId)).rejects.toThrow();
+      expect(registry.isHealthy()).toBe(false);
+      expect(() => registry.verifyCredential(issued.credential)).toThrow(
+        /storage is unavailable/
+      );
+      expect(() => registry.mintSession(issued.credential)).toThrow(
+        /storage is unavailable/
+      );
+    } finally {
+      await rm(directory, { force: true });
+      await rename(displaced, directory);
+    }
+
+    const reopened = await HumanCredentialRegistry.open({ filePath });
+    expect(reopened.isHealthy()).toBe(true);
+    expect(reopened.verifyCredential(issued.credential)).toEqual({
+      personId: "person:partner"
     });
   });
 

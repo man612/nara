@@ -674,6 +674,7 @@ export class PasskeyRegistry {
   private readonly enrollmentTtlMs: number;
   private readonly ceremonyTtlMs: number;
   private writeChain: Promise<void> = Promise.resolve();
+  private storageFailure: Error | undefined;
 
   private constructor(private readonly options: PasskeyRegistryOptions) {
     const rpId = options.rpId.trim().toLowerCase();
@@ -725,6 +726,10 @@ export class PasskeyRegistry {
     return registry;
   }
 
+  isHealthy(): boolean {
+    return this.storageFailure === undefined;
+  }
+
   async issueEnrollment(input: {
     personId: string;
     accountId?: string;
@@ -734,6 +739,7 @@ export class PasskeyRegistry {
     enrollmentToken: string;
     expiresAt: string;
   }> {
+    this.assertStorageHealthy();
     const personId = input.personId.trim();
     if (!personId) throw new Error("personId must not be empty");
     if (input.accountId !== undefined && !input.accountId.trim()) {
@@ -775,6 +781,7 @@ export class PasskeyRegistry {
   getEnrollmentIdentity(
     enrollmentToken: string
   ): HumanViewerIdentity {
+    this.assertStorageHealthy();
     const enrollment = this.requireEnrollment(enrollmentToken);
     return {
       personId: enrollment.personId,
@@ -788,6 +795,7 @@ export class PasskeyRegistry {
     enrollmentToken: string;
     displayName: string;
   }): PasskeyRegistrationOptions {
+    this.assertStorageHealthy();
     const enrollment = this.requireEnrollment(input.enrollmentToken);
     const existing = this.activePasskeysForPerson(enrollment.personId);
     if (existing.length >= MAX_CREDENTIALS_PER_PERSON) {
@@ -853,6 +861,7 @@ export class PasskeyRegistry {
     enrollmentToken: string;
     credential: unknown;
   }): Promise<PasskeyRecord> {
+    this.assertStorageHealthy();
     this.prune();
     const ceremony = this.registrationCeremonies.get(input.ceremonyId);
     if (!ceremony || ceremony.expiresAtMs <= this.now()) {
@@ -963,6 +972,7 @@ export class PasskeyRegistry {
   }
 
   createAuthenticationOptions(): PasskeyAuthenticationOptions {
+    this.assertStorageHealthy();
     this.prune();
     const challenge = randomBytes(CHALLENGE_BYTES).toString("base64url");
     const ceremonyId = randomUUID();
@@ -986,6 +996,7 @@ export class PasskeyRegistry {
     ceremonyId: string;
     credential: unknown;
   }): Promise<HumanViewerIdentity> {
+    this.assertStorageHealthy();
     this.prune();
     const ceremony = this.authenticationCeremonies.get(input.ceremonyId);
     if (!ceremony || ceremony.expiresAtMs <= this.now()) {
@@ -1092,6 +1103,7 @@ export class PasskeyRegistry {
   }
 
   listForPerson(personIdInput: string): PasskeyRecord[] {
+    this.assertStorageHealthy();
     const personId = personIdInput.trim();
     if (!personId) return [];
     return [...this.passkeys.values()]
@@ -1103,6 +1115,7 @@ export class PasskeyRegistry {
   }
 
   async revoke(credentialIdInput: string): Promise<void> {
+    this.assertStorageHealthy();
     const credentialId = credentialIdInput.trim();
     const record = this.passkeys.get(credentialId);
     if (!record) {
@@ -1196,7 +1209,15 @@ export class PasskeyRegistry {
     this.prune();
   }
 
+  private assertStorageHealthy(): void {
+    if (!this.storageFailure) return;
+    throw new Error(
+      `Passkey storage is unavailable: ${this.storageFailure.message}`
+    );
+  }
+
   private persist(): Promise<void> {
+    this.assertStorageHealthy();
     const snapshot = {
       version: 1 as const,
       passkeys: [...this.passkeys.values()].map((record) =>
@@ -1207,17 +1228,25 @@ export class PasskeyRegistry {
       )
     };
 
-    this.writeChain = this.writeChain.then(async () => {
-      await mkdir(dirname(this.options.filePath), { recursive: true });
-      const temporary =
-        this.options.filePath + "." + process.pid.toString() + ".tmp";
-      await writeFile(
-        temporary,
-        JSON.stringify(snapshot, null, 2) + "\n",
-        { encoding: "utf8", mode: 0o600 }
-      );
-      await rename(temporary, this.options.filePath);
-    });
+    this.writeChain = this.writeChain
+      .then(async () => {
+        await mkdir(dirname(this.options.filePath), { recursive: true });
+        const temporary =
+          this.options.filePath + "." + process.pid.toString() + ".tmp";
+        await writeFile(
+          temporary,
+          JSON.stringify(snapshot, null, 2) + "\n",
+          { encoding: "utf8", mode: 0o600 }
+        );
+        await rename(temporary, this.options.filePath);
+      })
+      .catch((error: unknown) => {
+        this.storageFailure =
+          error instanceof Error
+            ? error
+            : new Error("Unknown passkey persistence failure");
+        throw this.storageFailure;
+      });
     return this.writeChain;
   }
 }

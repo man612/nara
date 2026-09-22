@@ -4,9 +4,9 @@ import {
   randomBytes,
   sign
 } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { PasskeyRegistry } from "../src/identity/passkeys.js";
 
@@ -285,6 +285,45 @@ describe("PasskeyRegistry", () => {
         }
       })
     ).rejects.toThrow(/counter did not advance/);
+  });
+
+  it("fails closed after persistence errors and reloads the previous durable enrollment", async () => {
+    const { registry, filePath } = await registryFixture();
+    const durable = await registry.issueEnrollment({
+      personId: "person:partner"
+    });
+
+    const directory = dirname(filePath);
+    const displaced = `${directory}-durable`;
+    await rename(directory, displaced);
+    await writeFile(directory, "blocker", "utf8");
+
+    try {
+      await expect(
+        registry.issueEnrollment({ personId: "person:other" })
+      ).rejects.toThrow();
+      expect(registry.isHealthy()).toBe(false);
+      expect(() =>
+        registry.getEnrollmentIdentity(durable.enrollmentToken)
+      ).toThrow(/storage is unavailable/);
+      expect(() => registry.createAuthenticationOptions()).toThrow(
+        /storage is unavailable/
+      );
+    } finally {
+      await rm(directory, { force: true });
+      await rename(displaced, directory);
+    }
+
+    const reopened = await PasskeyRegistry.open({
+      filePath,
+      rpId: "nara.example",
+      rpName: "Nara",
+      origins: ["https://nara.example"]
+    });
+    expect(reopened.isHealthy()).toBe(true);
+    expect(
+      reopened.getEnrollmentIdentity(durable.enrollmentToken)
+    ).toEqual({ personId: "person:partner" });
   });
 
   it("fails closed on wrong origin and consumes no enrollment", async () => {
