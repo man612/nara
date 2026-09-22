@@ -118,7 +118,7 @@ describe("ChainedVoiceProvider", () => {
       if (event.type === "tool.call") {
         await session.sendToolResult?.({
           name: event.name,
-          callId: event.callId,
+          callId: event.callId!,
           ok: true,
           value: { answer: "server-only" }
         });
