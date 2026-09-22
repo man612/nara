@@ -10,14 +10,33 @@ export type AudioChunk = {
   channels: 1 | 2;
 };
 
-export type BrainMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
+export type BrainToolCall = {
+  id: string;
+  name: string;
+  arguments: unknown;
 };
+
+export type BrainMessage =
+  | {
+      role: "system" | "user";
+      content: string;
+    }
+  | {
+      role: "assistant";
+      content: string;
+      toolCalls?: BrainToolCall[];
+    }
+  | {
+      role: "tool";
+      content: string;
+      toolCallId: string;
+      name: string;
+    };
 
 export type BrainRequest = {
   messages: BrainMessage[];
   tools?: unknown[];
+  signal?: AbortSignal;
 };
 
 export type ProviderUsage = {
@@ -30,7 +49,7 @@ export type ProviderUsage = {
 
 export type BrainResponse = {
   text: string;
-  toolCalls?: unknown[];
+  toolCalls?: BrainToolCall[];
   providerId?: string;
   usage?: ProviderUsage;
 };
@@ -54,6 +73,26 @@ export type SearchOptions = {
 export interface SearchProvider {
   readonly id: string;
   search(query: string, options?: SearchOptions): Promise<SearchResult[]>;
+}
+
+export type SpeechRequestOptions = {
+  signal?: AbortSignal;
+};
+
+export interface SpeechToTextProvider {
+  readonly id: string;
+  transcribe(
+    audio: AudioChunk,
+    options?: SpeechRequestOptions
+  ): Promise<string>;
+}
+
+export interface TextToSpeechProvider {
+  readonly id: string;
+  synthesize(
+    text: string,
+    options?: SpeechRequestOptions
+  ): Promise<AudioChunk>;
 }
 
 export interface MemoryProvider {
