@@ -1,6 +1,6 @@
 # First-use onboarding and identity
 
-Status: device registry, one-time claim core, passkey/WebAuthn human authentication and temporary physical-device viewer grants are implemented; production device-side claim delivery, secure commissioning and polished recovery/transfer UX remain staged.
+Status: device registry, one-time claim core, passkey/WebAuthn human authentication, temporary physical-device viewer grants and the first DPP Wi-Fi commissioning path are implemented; production device-side claim delivery, secure universal fallback commissioning and polished recovery/transfer UX remain staged.
 
 Last reviewed: 2026-09-21
 
@@ -143,7 +143,9 @@ Nara firmware already has first-boot Wi-Fi configuration, hotspot provisioning, 
 
 ### Wi-Fi Easy Connect / DPP
 
-ESP32-S3 supports Wi-Fi Easy Connect enrollee mode using a QR displayed on the device. On compatible Android phones, the phone can provision the ESP32-S3 to Wi-Fi without manually entering the Wi-Fi password into Nara.
+ESP32-S3 supports Wi-Fi Easy Connect enrollee mode using a QR displayed on the device. Nara Firmware now implements this path on Waveshare 1.85B: it generates/displays the DPP bootstrap QR, receives credentials through ESP-IDF DPP events and stores them through the existing saved-network store. On compatible phones, Wi-Fi can therefore be provisioned without manually entering the Wi-Fi password into Nara.
+
+DPP is not treated as universal. BOOT provides an explicit fallback path for phones that do not support Wi-Fi Easy Connect, and DPP authentication failure does not silently downgrade itself to the weaker fallback. Real-device compatibility and power/RF behavior still need HIL validation.
 
 Advantages: standardized, public-key-based, no Nara app required on supported phones, and a strong fit for the 360x360 display.
 
@@ -239,7 +241,7 @@ Current server now supports a persistent runtime-private device registry and per
 
 A passkey/WebAuthn HTTP surface now exists for strong human registration and sign-in, including server-bound enrollment, origin/RP checks and short-lived viewer sessions. This is distinct from the still-staged public gift/device-claim UX: production account approval, device-side claim delivery and commissioning must remain capability-scoped rather than treating possession of a transport token or speaker match as account authorization.
 
-Firmware provisioning branding has been cleaned up to Nara. Production secure provisioning still needs to replace the inherited open hotspot path before shipping.
+Firmware provisioning branding has been cleaned up to Nara and DPP QR commissioning is implemented on the first Waveshare target. The inherited open hotspot path remains only a fallback; production still needs a secure universal BLE/SoftAP fallback before shipping.
 
 ## Suggested implementation order
 
@@ -253,7 +255,7 @@ Firmware provisioning branding has been cleaned up to Nara. Production secure pr
 8. Connect authenticated identity to viewer resolution and personal-memory access. — implemented for passkey-authenticated phone sessions and expiring per-device trusted viewer grants.
 9. Add optional voice enrollment after secure claim works. — speaker-recognition runtime exists; user-facing enrollment/calibration UX remains.
 10. Add reset/unlink/transfer/credential-rotation tests and product UX. — credential rotation/revocation foundations are tested; full transfer/recovery UX remains.
-11. Benchmark DPP and secure BLE/SoftAP provisioning on the real Waveshare board.
+11. Benchmark the implemented DPP path and the future secure BLE/SoftAP fallback on the real Waveshare board/phones.
 12. Polish the gift reveal dialogue/animation after the security flow is solid.
 
 ## Acceptance criteria

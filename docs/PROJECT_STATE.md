@@ -58,7 +58,8 @@ Real names, private biography, relationship details, credentials, recordings and
 - local blink/gaze/breathing and audio-driven mouth motion;
 - useful no-network startup: configured devices do not fall back into endless provisioning when known Wi-Fi is temporarily absent;
 - background saved-network scan/retry and automatic gateway recovery;
-- deliberate BOOT long-press recovery into Wi-Fi configuration;
+- ESP-IDF Wi-Fi Easy Connect / DPP QR commissioning foundation on the Waveshare 1.85B target;
+- deliberate BOOT interaction for DPP commissioning/retry plus explicit fallback provisioning when the phone does not support DPP;
 - physical CST816S/QMI8658 bring-up and local interaction path;
 - CST816S touch-driven gaze plus deterministic tap, double-tap, hold and stroke/pet classification;
 - deterministic flip/shake/spin gesture classifier foundation;
@@ -202,7 +203,7 @@ Still staged:
 - local notes/messages/media beyond the implemented authorized capsule;
 - direct secure SoftAP peer UI on the ESP32;
 - local-network STT/LLM/TTS adapters;
-- production DPP / secure provisioning migration.
+- production secure BLE/SoftAP fallback provisioning and real-device DPP compatibility/power validation.
 
 Do not promise unrestricted Indonesian free-form STT/TTS on the ESP32-S3 alone. ESP-SR's supported command/TTS language limits still apply.
 
@@ -252,10 +253,12 @@ stroke/pet browsing. Remaining product-layer work is optional enrichment:
 
 ### P3 — production commissioning/direct peer
 
-Replace/contain the inherited open provisioning path before private direct-peer data exists:
+DPP QR commissioning is now implemented in firmware as the preferred standardized fast path where the phone supports Wi-Fi Easy Connect. The inherited open/plain-HTTP portal remains only an explicit fallback and must still be replaced/contained before private direct-peer data exists.
 
-- secure SoftAP or ESP-IDF provisioning Security 2;
-- DPP where supported;
+Remaining production work:
+
+- validate DPP QR scanning, router compatibility, RF behavior and power on real phones/hardware;
+- add secure SoftAP or ESP-IDF provisioning Security 2 as the universal fallback;
 - application/session authorization;
 - explicit physical activation;
 - short-lived credentials;
