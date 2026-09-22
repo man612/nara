@@ -1,4 +1,7 @@
-import type { ToolDefinition, ToolResult } from "../actions/contracts.js";
+import type {
+  ToolDefinition,
+  ToolResult
+} from "../actions/contracts.js";
 
 export type AudioChunk = {
   format: "pcm16le";
@@ -73,9 +76,7 @@ export type VoiceSessionEvent =
   | { type: "usage"; usage: ProviderUsage }
   | { type: "error"; message: string };
 
-export type VoiceEventHandler = (
-  event: VoiceSessionEvent,
-) => void | Promise<void>;
+export type VoiceEventHandler = (event: VoiceSessionEvent) => void | Promise<void>;
 
 export type VoiceConnectOptions = {
   tools?: ToolDefinition[];
