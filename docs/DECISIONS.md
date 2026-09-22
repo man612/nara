@@ -172,3 +172,26 @@ Consequences:
   speech endpoints;
 - this path is expected to trade some conversational latency/natural overlap
   for lower cost, portability and self-hosting flexibility.
+
+## 2026-09-22 — Sensitive Action Runtime tools fail closed
+
+**Status:** accepted
+
+Tool `effect` is an authorization boundary, not model-facing decoration.
+
+Consequences:
+
+- `sensitive` tools are not advertised to a voice/brain model when a session
+  has no explicit action authorizer;
+- direct execution of a sensitive tool is denied by the default policy even if
+  a caller somehow knows the tool name;
+- policy exceptions/errors fail closed before a ToolProvider is invoked;
+- a custom authorizer may inspect the provider ID, immutable tool definition
+  and concrete call arguments, so future approval UX can make a narrow
+  per-session decision;
+- firmware and phone bridges can bind authorization to authenticated session
+  context;
+- model text, tool arguments and speaker recognition can never self-approve a
+  sensitive action;
+- dangerous firmware operations remain unexposed rather than relying only on
+  this policy layer.
