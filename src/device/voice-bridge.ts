@@ -4,6 +4,8 @@ import type {
 } from "../audio/codec.js";
 import { ActionRuntime } from "../actions/runtime.js";
 import type {
+  ActionAuthorizationDecision,
+  ActionAuthorizationRequest,
   ToolCall,
   ToolProvider,
   ToolResult
@@ -65,6 +67,13 @@ export type FirmwareVoiceBridgeOptions = {
     session: FirmwareSessionInfo,
     transport: FirmwareSessionTransport
   ) => ToolProvider[] | Promise<ToolProvider[]>;
+
+  authorizeTool?: (
+    session: FirmwareSessionInfo,
+    request: ActionAuthorizationRequest
+  ) =>
+    | ActionAuthorizationDecision
+    | Promise<ActionAuthorizationDecision>;
 
   createSpeakerRecognizer?: (
     session: FirmwareSessionInfo
@@ -535,7 +544,14 @@ export class FirmwareVoiceBridge {
 
     const actions =
       toolProviders.length > 0
-        ? await ActionRuntime.create(toolProviders)
+        ? await ActionRuntime.create(toolProviders, {
+            ...(this.options.authorizeTool
+              ? {
+                  authorize: (request) =>
+                    this.options.authorizeTool!(session, request)
+                }
+              : {})
+          })
         : null;
 
     let voice: VoiceSession;
