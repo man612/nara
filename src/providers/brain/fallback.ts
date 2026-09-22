@@ -21,6 +21,10 @@ export class FallbackBrainProvider implements BrainProvider {
     const failures: string[] = [];
 
     for (const provider of this.providers) {
+      if (request.signal?.aborted) {
+        throw request.signal.reason ?? new Error("Brain request cancelled");
+      }
+
       try {
         const response = await provider.complete(request);
         return {
@@ -28,6 +32,9 @@ export class FallbackBrainProvider implements BrainProvider {
           providerId: response.providerId ?? provider.id
         };
       } catch (error) {
+        if (request.signal?.aborted) {
+          throw request.signal.reason ?? error;
+        }
         const message = error instanceof Error ? error.message : String(error);
         failures.push(`${provider.id}: ${message}`);
       }

@@ -14,8 +14,9 @@ The gateway codec boundary is session-scoped: each physical connection owns its 
 
 Native speech-to-speech providers are the preferred path when low latency, barge-in and natural turn taking matter.
 
-Implemented production adapter:
-- Gemini Live.
+Implemented production adapters:
+- Gemini Live for native speech-to-speech.
+- Chained STT -> BrainProvider -> TTS for portable/cost-aware turn-based voice.
 
 Planned native adapter:
 - GPT-Live.
@@ -43,17 +44,33 @@ A configured route may contain a primary voice provider plus fallback providers.
 
 Fallback currently happens while opening a voice session: if the primary cannot be constructed or cannot connect, Nara tries the next configured provider. This is intentionally separate from in-session recovery. Once a realtime conversation has opened on one provider, Nara does not migrate that active conversation to a different provider yet.
 
-The example configuration only activates Gemini Live because GPT-Live and chained voice are not implemented yet. A second implemented adapter can be added to `voice.fallbacks` without changing firmware.
+The example configuration activates Gemini Live by default. The implemented
+`chained` adapter is opt-in because each deployment must deliberately choose
+its STT/TTS endpoints. Once configured, it can be added to `voice.fallbacks`
+without changing firmware. GPT-Live remains planned.
 
 ## Chained voice
 
-A chained runtime is:
+The implemented chained runtime is:
 
-`STT -> BrainProvider -> TTS`
+`PCM turn -> STT -> BrainProvider -> Action Runtime tools -> BrainProvider -> TTS -> PCM`
 
-This path is planned but not implemented yet. It is valuable for inexpensive or self-hosted deployments because it can mix local Whisper, hosted transcription, any configured brain, and local/free/hosted TTS.
+It buffers one bounded 16 kHz mono PCM turn, transcribes it, sends the text
+through Nara's existing brain route, executes normalized tool calls through the
+same server-side Action Runtime used by Gemini Live, and synthesizes the final
+answer back to PCM. Search, memory and device tools therefore remain available
+instead of being bypassed by the cheaper voice path.
 
-It normally has more latency than native speech-to-speech but gives maximum portability.
+STT/TTS use replaceable provider contracts. The first adapters target
+OpenAI-compatible audio endpoints, so a deployment may point them at a hosted
+service or a compatible local gateway. The brain remains Nara's configured
+BrainProvider/fallback route.
+
+Interruption aborts the active STT/brain/tool-wait/TTS turn through
+`AbortSignal`. Input buffering, speech text and conversation history are
+bounded. The runtime is turn-based, so it normally has more latency and less
+natural overlap than native speech-to-speech, but it provides a practical
+cost-aware and self-hostable foundation.
 
 ## Optional framework runtimes
 

@@ -4,9 +4,17 @@ Provider choice is configuration, not architecture.
 
 ## Voice
 
-Implemented production adapter:
+Implemented production adapters:
 
 - `gemini-live`: native Gemini Live audio adapter.
+- `chained`: bounded STT -> BrainProvider -> TTS turn runtime. It preserves
+  Action Runtime tool calls and can use authenticated cloud endpoints or
+  unauthenticated local OpenAI-compatible speech gateways.
+
+Implemented speech adapters:
+
+- `openai-compatible` STT: multipart WAV -> `/audio/transcriptions`.
+- `openai-compatible` TTS: text -> raw PCM from `/audio/speech`.
 
 Implemented test adapter:
 
@@ -15,12 +23,12 @@ Implemented test adapter:
 Planned adapters:
 
 - `openai-live`: native full-duplex GPT-Live adapter.
-- `chained`: STT -> brain -> TTS; inexpensive/self-hostable path, normally less conversational.
 - Pipecat-backed realtime pipelines where their ecosystem is useful.
 
 Do not put planned adapter IDs into an active provider route until their adapter exists in `src/provider-registry.ts`.
 
-Native realtime providers and future chained voice share the same `VoiceProvider` contract.
+Native realtime and chained voice share the same `VoiceProvider` contract.
+Chained speech endpoints are deployment choices, not core dependencies.
 
 ## Brain
 
@@ -46,7 +54,7 @@ Brain providers use an ordered request-time fallback chain.
 
 Voice providers now use an ordered connect-time fallback chain. When a configured voice provider cannot be constructed or cannot open a session, Nara tries the next configured voice provider. A successfully opened realtime session is not migrated to another provider in the middle of a conversation yet.
 
-Only configure fallback IDs whose adapters are actually implemented. The example configuration intentionally leaves voice fallbacks empty until a second production voice adapter lands.
+Only configure fallback IDs whose adapters are actually implemented. The example configuration keeps voice fallbacks empty by default so deployments explicitly choose STT/TTS endpoints before enabling the implemented `chained` route.
 
 ## Deployment
 

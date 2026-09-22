@@ -148,3 +148,27 @@ Reason:
 The project owner wants the source visible without granting the broad
 use/modification/redistribution rights that define open-source licensing.
 Using an OSI license or PolyForm Strict would grant more rights than intended.
+
+## 2026-09-22 — Chained voice is an opt-in provider-neutral fallback
+
+**Status:** accepted
+
+Nara implements a turn-based `STT -> BrainProvider -> Action Runtime tools -> TTS`
+voice adapter in addition to native realtime voice.
+
+Consequences:
+
+- firmware and phone clients keep using the same `VoiceProvider` /
+  `VoiceSession` boundary;
+- STT and TTS are replaceable provider contracts rather than being coupled to
+  one vendor or bundled model;
+- the first speech adapters use OpenAI-compatible audio endpoints so hosted
+  services and compatible local gateways can be selected by configuration;
+- the brain continues to use Nara's existing provider route/fallback and
+  normalized tool-call boundary;
+- interruption propagates cancellation through STT, brain requests, pending
+  Action Runtime calls and TTS;
+- the chained path is not enabled by default until a deployment selects its
+  speech endpoints;
+- this path is expected to trade some conversational latency/natural overlap
+  for lower cost, portability and self-hosting flexibility.
