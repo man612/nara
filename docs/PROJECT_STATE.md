@@ -19,6 +19,8 @@ Real names, private biography, relationship details, credentials, recordings and
 - physical firmware WebSocket handshake and Opus framing;
 - session-scoped Opus/PCM transcoding using production `libopus-wasm`;
 - Gemini Live realtime voice adapter;
+- provider-neutral chained STT -> BrainProvider -> Action Runtime tools -> TTS voice adapter with bounded turn buffering and cancellation;
+- OpenAI-compatible STT and raw-PCM TTS adapters that can target hosted or local compatible gateways;
 - provider-neutral `VoiceProvider` / `VoiceSession` boundary;
 - ordered connect-time voice fallback;
 - bounded playback pacing, interruption and barge-in lifecycle;
@@ -203,7 +205,7 @@ Still staged:
 - richer local navigation/status UI around the utility foundation;
 - local notes/messages/media beyond the implemented authorized capsule;
 - direct secure SoftAP peer UI on the ESP32;
-- local-network STT/LLM/TTS adapters;
+- a selected/calibrated local Indonesian STT/TTS model stack for the implemented chained voice contracts;
 - production secure BLE/SoftAP fallback provisioning and real-device DPP compatibility/power validation.
 
 Do not promise unrestricted Indonesian free-form STT/TTS on the ESP32-S3 alone. ESP-SR's supported command/TTS language limits still apply.
@@ -272,7 +274,7 @@ not sit in the realtime voice critical path. Remaining ecosystem expansion is
 non-blocking:
 
 - additional search adapters beyond the implemented SearXNG path where deployment needs them;
-- additional voice providers such as GPT Live/chained local voice;
+- additional native voice providers such as GPT Live and additional STT/TTS adapters;
 - reminders/calendar/home automation connectors;
 - richer local-network STT/LLM/TTS.
 
