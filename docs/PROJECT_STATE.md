@@ -45,7 +45,10 @@ Real names, private biography, relationship details, credentials, recordings and
 - allowlisted Telegram bridge with ask/say/notify/status/agent commands;
 - durable per-device remote inbox with TTL, leasing, retry and authenticated device poll/ack;
 - idle remote delivery that keeps queued voice prompts server-side and does not require an always-on realtime model session;
-- bounded authenticated network-diagnostic endpoints shared with firmware.
+- bounded authenticated network-diagnostic endpoints shared with firmware;
+- WebAuthn/passkey registration and authentication with server-bound challenges, RP/origin checks and real signature verification;
+- short-lived authenticated human viewer sessions plus expiring per-device trusted viewer grants;
+- dynamic private-memory viewer resolution on every memory tool call, so expired/revoked physical-device grants fail back to guest.
 
 ### Firmware / Waveshare 1.85B
 
@@ -109,11 +112,11 @@ This proves **which Nara device** connected. It does not prove which human is cu
 
 Speaker recognition is deliberately not root authentication.
 
-Current realtime personal-memory tools bind the viewer server-side to `person:guest`. Therefore realtime speech can retrieve only facts shareable with a guest/public viewer.
+Realtime speech does not infer private-memory privilege from the speaker's voice. A physical device remains guest/public-scoped unless a strong authenticated human explicitly grants that device a short-lived trusted viewer role.
 
-A strong phone/account/passkey or explicit physical approval signal is still required before trusted/private personal-memory privilege can be bound to a live session.
+WebAuthn/passkey registration and authentication are implemented. Successful passkey authentication mints the existing short-lived human viewer session, and that authenticated human can unlock/relock a physical Nara device with an expiring viewer grant. Memory tools resolve the grant again on every call, so expiry or revocation downgrades the same live voice session back to guest.
 
-The phone-audio bridge token authorizes that transport only. It also does not automatically grant trusted/private personal-memory access.
+The phone-audio bridge transport credential remains separate from human authorization. Possessing the phone transport token alone does not grant trusted/private personal-memory access.
 
 ## Connectivity state
 
@@ -189,7 +192,9 @@ Already implemented:
 - local battery policy;
 - RTC-backed clock restore/synchronization;
 - persistent timer and daily alarm foundations;
-- touch shortcuts for local time and a configurable quick timer.
+- touch shortcuts for local time and a configurable quick timer;
+- recipient-safe offline personal capsule parsing and deterministic lookup;
+- token-free Nara Says physical minigame.
 
 Still staged:
 
@@ -224,19 +229,16 @@ Validate on the real Waveshare board/final enclosure:
 
 CI proves code/build/protocol behavior; it cannot prove acoustics, radio conditions or physical sensor calibration.
 
-### P1 — strong human authorization
+### P1 — human authorization hardening
 
-Bind a strong authenticated human viewer to sessions before private/trusted memory is exposed.
+The passkey-first strong-viewer path is implemented: WebAuthn registration/authentication can mint short-lived human sessions, and an authenticated human can grant a physical Nara device temporary trusted/private viewer access. Speaker recognition is still only a confidence/personalization signal, and ambiguous or expired authorization fails down to guest.
 
-Required properties:
+Remaining hardening is product/operations work:
 
-- transport/device authentication is not enough;
-- speaker recognition remains a confidence signal only;
-- ambiguous identity fails down to guest, not up to owner/partner;
-- private-memory access uses the same existing viewer policy;
-- reset/transfer/revoke lifecycle remains explicit.
-
-Passkey-first account authentication remains the preferred product direction.
+- recovery and account-lifecycle UX beyond the legacy bootstrap/recovery credential;
+- production RP-ID/origin configuration and deployment checks;
+- reset/transfer/revoke UX around trusted viewer grants;
+- hardware-in-the-loop validation of the physical unlock/relock flow.
 
 ### P2 — isolated-device utility/capsule UX
 
@@ -306,7 +308,7 @@ For optional person-tracking gaze, the base Waveshare board has no camera. An ex
 
 Still intentionally open:
 
-- concrete passkey/account service and recovery UX;
+- production passkey recovery/account-lifecycle UX;
 - encryption-at-rest/key ownership for private memory;
 - encryption/authenticity policy for private capsule/assets at rest and on removable media;
 - exact local-network Indonesian STT/TTS/LLM stack;
