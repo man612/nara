@@ -117,11 +117,13 @@ server-side rather than being exposed through the polling response.
 Identity and memory have fail-closed boundaries. Devices have a persistent
 claim/credential lifecycle with rotation and revocation. Personal facts are
 subject/viewer-aware, validated before persistence, and filtered before model
-context. Realtime physical voice deliberately remains guest/public-scoped until
-a strong authenticated human viewer is bound to the session; speaker
-recognition is personalization evidence, not root authorization. Authenticated
-phone sessions already have a strong bearer-based viewer boundary, while a
-passkey-first production account/recovery UX remains future hardening.
+context. Speaker recognition remains personalization evidence, not root
+authorization. WebAuthn/passkey registration and authentication are implemented
+for strong human viewer sessions, and a passkey-authenticated person can grant a
+short-lived trusted/private viewer role to a physical Nara device. Memory tools
+re-resolve that grant on every call so expiry or revocation falls back to guest
+without trusting the speaker's voice as a password. Legacy bearer credentials
+remain a bootstrap/recovery path rather than the preferred daily sign-in.
 
 The standalone Waveshare 1.85B firmware builds in full ESP-IDF CI and includes
 Nara's parametric face, local audio-driven mouth motion, CST816S touch input,
@@ -146,8 +148,9 @@ The major remaining uncertainties are now physical or production-hardening
 items rather than missing core companion logic: microphone/AEC/speaker tuning,
 final gesture calibration, battery-life and polling measurements, phone/TWS
 validation on real devices, external-camera field-of-view/orientation,
-passkey/recovery UX, production secure commissioning/direct-peer mode, and
-optional additional voice/search/local-network providers.
+passkey recovery/account-lifecycle polish, production secure
+commissioning/direct-peer mode, and optional additional
+voice/search/local-network providers.
 
 ## Ownership and licensing
 
