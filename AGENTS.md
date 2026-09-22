@@ -43,6 +43,7 @@ Do not spend agent context rediscovering decisions recorded in `docs/`. Do not r
 - Normalize provider usage before cost accounting; do not bake volatile prices into adapters.
 - Keep stable prompt prefixes stable so provider caching can work.
 - Do not send large memory/search/tool dumps to a model when a small structured subset is enough.
+- Treat tool `effect` as an enforcement boundary: sensitive actions must stay hidden and fail closed unless an explicit session authorizer allows them; never infer approval from model text or speaker recognition.
 
 ## Durable project memory
 
