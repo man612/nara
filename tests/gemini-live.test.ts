@@ -362,6 +362,55 @@ describe("Gemini Live provider", () => {
     }
   });
 
+  it("bounds queued microphone audio while a reconnect is pending", async () => {
+    const harness = createHarness();
+    const { session, socket } = await connectHarness(
+      harness.factory,
+      harness.sockets
+    );
+
+    try {
+      socket.message({
+        sessionResumptionUpdate: {
+          resumable: true,
+          newHandle: "resume-bounded"
+        }
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      socket.close(1012, "service restart");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(harness.sockets).toHaveLength(2);
+      for (let index = 0; index < 20; index += 1) {
+        const data = new Uint8Array(16 * 1024);
+        data.fill(index);
+        await session.sendAudio({
+          format: "pcm16le",
+          data,
+          sampleRate: 16000,
+          channels: 1
+        });
+      }
+      await session.endAudioStream?.();
+
+      const resumed = harness.sockets[1]!;
+      resumed.open();
+      resumed.message({ setupComplete: {} });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(resumed.sent.length).toBeLessThanOrEqual(7);
+      expect(JSON.parse(resumed.sent.at(-1)!)).toEqual({
+        realtimeInput: { audioStreamEnd: true }
+      });
+      const latestAudio = JSON.parse(resumed.sent.at(-2)!);
+      expect(
+        Buffer.from(latestAudio.realtimeInput.audio.data, "base64")[0]
+      ).toBe(19);
+    } finally {
+      await session.close();
+    }
+  });
+
   it("reconnects on GoAway using the latest resumable handle", async () => {
     const harness = createHarness();
     const { session, socket } = await connectHarness(

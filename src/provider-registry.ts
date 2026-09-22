@@ -31,7 +31,10 @@ function createBrainProvider(id: string, definition: ProviderDefinition): BrainP
       id,
       baseUrl: definition.base_url,
       model: definition.model,
-      ...(apiKey ? { apiKey } : {})
+      ...(apiKey ? { apiKey } : {}),
+      ...(definition.timeout_ms !== undefined
+        ? { timeoutMs: definition.timeout_ms }
+        : {})
     });
   }
 

@@ -31,6 +31,9 @@ import {
   type FirmwareProtocolVersion
 } from "./device/firmware-wire.js";
 
+const DEFAULT_MAX_WEBSOCKET_PAYLOAD_BYTES = 256 * 1024;
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
+
 export type FirmwareSessionInfo = {
   sessionId: string;
   protocolVersion: FirmwareProtocolVersion;
@@ -111,6 +114,8 @@ export type GatewayOptions = {
   phoneBridgeHtml?: string;
   httpHandlers?: GatewayHttpHandler[];
   hooks?: GatewayHooks;
+  maxWebSocketPayloadBytes?: number;
+  heartbeatIntervalMs?: number;
 };
 
 export type GatewayServer = {
@@ -213,6 +218,27 @@ export function isGatewayDeviceAuthorized(
 }
 
 export function createGatewayServer(options: GatewayOptions = {}): GatewayServer {
+  const maxWebSocketPayloadBytes =
+    options.maxWebSocketPayloadBytes ?? DEFAULT_MAX_WEBSOCKET_PAYLOAD_BYTES;
+  if (
+    !Number.isInteger(maxWebSocketPayloadBytes) ||
+    maxWebSocketPayloadBytes < 1024 ||
+    maxWebSocketPayloadBytes > 8 * 1024 * 1024
+  ) {
+    throw new Error("Gateway WebSocket payload limit must be from 1 KiB to 8 MiB");
+  }
+
+  const heartbeatIntervalMs =
+    options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
+  if (
+    !Number.isInteger(heartbeatIntervalMs) ||
+    heartbeatIntervalMs < 0 ||
+    heartbeatIntervalMs > 5 * 60_000 ||
+    (heartbeatIntervalMs > 0 && heartbeatIntervalMs < 1000)
+  ) {
+    throw new Error("Gateway heartbeat interval must be 0 or from 1s to 5m");
+  }
+
   const virtualDeviceHtml =
     options.virtualDeviceHtml ??
     resolve(process.cwd(), "virtual-device", "index.html");
@@ -275,13 +301,37 @@ export function createGatewayServer(options: GatewayOptions = {}): GatewayServer
   const wss = new WebSocketServer({
     server,
     path: "/device",
+    maxPayload: maxWebSocketPayloadBytes,
     verifyClient: (info: { req: IncomingMessage }) =>
       isGatewayDeviceAuthorized(info.req, options) ||
       isGatewayPhoneAuthorized(info.req, options.phoneToken)
   });
 
+  const responsiveClients = new WeakSet<WebSocket>();
+  if (heartbeatIntervalMs > 0) {
+    const heartbeat = setInterval(() => {
+      for (const client of wss.clients) {
+        if (!responsiveClients.has(client)) {
+          client.terminate();
+          continue;
+        }
+        responsiveClients.delete(client);
+        client.ping();
+      }
+    }, heartbeatIntervalMs);
+    heartbeat.unref();
+    wss.once("close", () => clearInterval(heartbeat));
+  }
+
   wss.on("connection", (socket, request) => {
     const sessionId = randomUUID();
+    responsiveClients.add(socket);
+    socket.on("pong", () => responsiveClients.add(socket));
+    socket.on("error", (error) => {
+      console.warn(
+        `[ws:${sessionId}] ${error instanceof Error ? error.message : String(error)}`
+      );
+    });
     const deviceId = headerString(request.headers["device-id"]);
     const clientId = headerString(request.headers["client-id"]);
     const deviceAuthorized = isGatewayDeviceAuthorized(request, options);
