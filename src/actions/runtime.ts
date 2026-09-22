@@ -1,4 +1,6 @@
 import type {
+  ActionAuthorizer,
+  ActionAuthorizationDecision,
   ToolCall,
   ToolDefinition,
   ToolProvider,
@@ -10,6 +12,23 @@ type ToolRoute = {
   definition: ToolDefinition;
 };
 
+export type ActionRuntimeOptions = {
+  maxExposedTools?: number;
+  authorize?: ActionAuthorizer;
+};
+
+function defaultAuthorize(
+  definition: ToolDefinition
+): ActionAuthorizationDecision {
+  if (definition.effect === "sensitive") {
+    return {
+      allowed: false,
+      reason: "Sensitive action requires explicit authorization"
+    };
+  }
+  return { allowed: true };
+}
+
 export class ActionRuntime {
   private readonly routes = new Map<string, ToolRoute>();
   private readonly active = new Map<string, AbortController>();
@@ -17,16 +36,19 @@ export class ActionRuntime {
 
   private constructor(
     private readonly providers: ToolProvider[],
-    private readonly maxExposedTools: number
+    private readonly maxExposedTools: number,
+    private readonly authorize: ActionAuthorizer
   ) {}
 
   static async create(
     providers: ToolProvider[],
-    options: { maxExposedTools?: number } = {}
+    options: ActionRuntimeOptions = {}
   ): Promise<ActionRuntime> {
     const runtime = new ActionRuntime(
       providers,
-      options.maxExposedTools ?? 20
+      options.maxExposedTools ?? 20,
+      options.authorize ??
+        ((request) => defaultAuthorize(request.definition))
     );
     await runtime.loadRoutes();
     return runtime;
@@ -53,6 +75,31 @@ export class ActionRuntime {
         ok: false,
         ...(call.callId ? { callId: call.callId } : {}),
         error: `Unknown tool: ${call.name}`
+      };
+    }
+
+    let authorization: ActionAuthorizationDecision;
+    try {
+      authorization = await this.authorize({
+        call,
+        definition: route.definition,
+        providerId: route.provider.id
+      });
+    } catch {
+      return {
+        name: call.name,
+        ok: false,
+        ...(call.callId ? { callId: call.callId } : {}),
+        error: "Action authorization failed"
+      };
+    }
+
+    if (!authorization.allowed) {
+      return {
+        name: call.name,
+        ok: false,
+        ...(call.callId ? { callId: call.callId } : {}),
+        error: authorization.reason
       };
     }
 
