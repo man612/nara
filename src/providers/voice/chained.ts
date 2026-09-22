@@ -211,10 +211,16 @@ class ChainedVoiceSession implements VoiceSession {
     if (this.closed) return;
     this.clearAudio();
     this.capturingSpeech = false;
-    const interrupted = this.abortActive(
+    const cancellation = this.abortActive(
       new Error("Chained voice turn interrupted")
     );
-    if (interrupted) {
+    if (cancellation.callIds.length > 0) {
+      await this.emit({
+        type: "tool.cancel",
+        callIds: cancellation.callIds
+      });
+    }
+    if (cancellation.aborted) {
       await this.emit({ type: "interrupted" });
     }
   }
@@ -230,10 +236,16 @@ class ChainedVoiceSession implements VoiceSession {
   }
 
   private startTurn(input: { audio?: AudioChunk; text?: string }): void {
-    const superseded = this.abortActive(
+    const cancellation = this.abortActive(
       new Error("Chained voice turn superseded")
     );
-    if (superseded) {
+    if (cancellation.callIds.length > 0) {
+      void this.emit({
+        type: "tool.cancel",
+        callIds: cancellation.callIds
+      });
+    }
+    if (cancellation.aborted) {
       void this.emit({ type: "interrupted" });
     }
 
@@ -380,15 +392,23 @@ class ChainedVoiceSession implements VoiceSession {
     }
   }
 
-  private abortActive(reason: Error): boolean {
+  private abortActive(reason: Error): {
+    aborted: boolean;
+    callIds: string[];
+  } {
+    const callIds = [...this.pendingTools.keys()];
     const controller = this.activeController;
-    if (!controller || controller.signal.aborted) return false;
-    controller.abort(reason);
+    const aborted = Boolean(controller && !controller.signal.aborted);
+
+    if (aborted) {
+      controller!.abort(reason);
+    }
     for (const pending of this.pendingTools.values()) {
       pending.reject(reason);
     }
     this.pendingTools.clear();
-    return true;
+
+    return { aborted, callIds };
   }
 
   private clearAudio(): void {
