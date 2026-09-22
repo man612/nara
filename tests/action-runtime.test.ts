@@ -94,6 +94,7 @@ describe("ActionRuntime", () => {
       })
     );
     const runtime = await ActionRuntime.create([provider]);
+    expect(runtime.listTools()).toEqual([]);
 
     await expect(
       runtime.execute({
@@ -133,6 +134,8 @@ describe("ActionRuntime", () => {
         return { allowed: true };
       }
     });
+    expect(runtime.listTools()).toEqual([sensitive]);
+
     const call: ToolCall = {
       name: "external_delete",
       arguments: { id: "item-1" },
