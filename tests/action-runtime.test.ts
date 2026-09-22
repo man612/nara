@@ -187,6 +187,50 @@ describe("ActionRuntime", () => {
     expect(provider.calls).toHaveLength(0);
   });
 
+  it("cancels safely while an asynchronous authorizer is still pending", async () => {
+    let resolveAuthorization!: () => void;
+    const authorizationStarted = new Promise<void>((resolve) => {
+      resolveAuthorization = resolve;
+    });
+    let releaseAuthorization!: () => void;
+    const authorizationGate = new Promise<void>((resolve) => {
+      releaseAuthorization = resolve;
+    });
+
+    const provider = new FakeToolProvider(
+      "device",
+      [definition],
+      async (call) => ({
+        name: call.name,
+        ok: true
+      })
+    );
+    const runtime = await ActionRuntime.create([provider], {
+      authorize: async () => {
+        resolveAuthorization();
+        await authorizationGate;
+        return { allowed: true };
+      }
+    });
+
+    const pending = runtime.execute({
+      name: "device_set_volume",
+      arguments: { volume: 30 },
+      callId: "policy-pending"
+    });
+    await authorizationStarted;
+    runtime.cancel(["policy-pending"]);
+    releaseAuthorization();
+
+    await expect(pending).resolves.toEqual({
+      name: "device_set_volume",
+      callId: "policy-pending",
+      ok: false,
+      error: "Action cancelled"
+    });
+    expect(provider.calls).toHaveLength(0);
+  });
+
   it("cancels active work independently from the voice lifecycle", async () => {
     let observedAbort = false;
     const provider = new FakeToolProvider(
