@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DeviceRegistry } from "../src/device/registry.js";
 
@@ -168,6 +168,34 @@ describe("device claim registry", () => {
     await registry.revokeDevice("device-a");
     expect(registry.verifyDeviceCredential("device-a", second.credential)).toBe(false);
     expect(registry.getDeviceState("device-a")).toBe("revoked");
+  });
+
+  it("fails closed after a persistence error and recovers from the durable snapshot", async () => {
+    const { registry, filePath } = await tempRegistry();
+    await registry.registerUnclaimedDevice({ deviceId: "device-a" });
+
+    const directory = dirname(filePath);
+    const displaced = `${directory}-durable`;
+    await rename(directory, displaced);
+    await writeFile(directory, "blocker", "utf8");
+
+    try {
+      await expect(registry.beginClaim("device-a")).rejects.toThrow();
+      expect(registry.isHealthy()).toBe(false);
+      expect(() => registry.getDeviceState("device-a")).toThrow(
+        /storage is unavailable/
+      );
+      expect(() =>
+        registry.verifyDeviceCredential("device-a", "anything")
+      ).toThrow(/storage is unavailable/);
+    } finally {
+      await rm(directory, { force: true });
+      await rename(displaced, directory);
+    }
+
+    const reopened = await DeviceRegistry.open({ filePath });
+    expect(reopened.isHealthy()).toBe(true);
+    expect(reopened.getDeviceState("device-a")).toBe("unclaimed");
   });
 
   it("persists only hashed secrets and survives restart", async () => {
