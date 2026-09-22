@@ -403,3 +403,33 @@ work that benefits from agent/browser/tool execution.
 Reference:
 
 - https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/api-server.md
+
+## OpenAI-compatible speech endpoint contract
+
+Purpose: define a small first STT/TTS adapter contract for chained voice
+without making OpenAI itself a mandatory Nara dependency.
+
+Useful findings:
+
+- the current OpenAI transcription API accepts an uploaded audio file,
+  including WAV, at `POST /audio/transcriptions`, with JSON transcription
+  output and optional ISO-639-1 language hint;
+- the current speech API uses `POST /audio/speech`, accepts a model, voice and
+  input text, and supports raw PCM output;
+- current OpenAI PCM playback examples use 24 kHz, 16-bit signed,
+  little-endian mono audio;
+- the speech endpoint limits one input request to 4096 characters.
+
+Decision:
+
+Nara's first chained speech adapters target only this narrow
+OpenAI-compatible surface. PCM turns are wrapped as WAV for STT; TTS requests
+raw PCM and exposes sample rate as deployment configuration. Cloud credentials
+remain server-side, and an unauthenticated compatible localhost gateway can be
+used by omitting `api_key_env`. Provider/model choice remains configuration.
+
+References:
+
+- https://developers.openai.com/api/reference/cli/resources/audio/subresources/transcriptions/methods/create
+- https://developers.openai.com/api/reference/cli/resources/audio/subresources/speech/methods/create
+- https://developers.openai.com/api/docs/guides/text-to-speech
