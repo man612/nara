@@ -29,6 +29,15 @@ function defaultAuthorize(
   return { allowed: true };
 }
 
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "then" in value &&
+    typeof (value as Promise<T>).then === "function"
+  );
+}
+
 export class ActionRuntime {
   private readonly routes = new Map<string, ToolRoute>();
   private readonly active = new Map<string, AbortController>();
@@ -86,31 +95,8 @@ export class ActionRuntime {
       };
     }
 
-    let authorization: ActionAuthorizationDecision;
-    try {
-      authorization = await this.authorize({
-        call,
-        definition: route.definition,
-        providerId: route.provider.id
-      });
-    } catch {
-      return {
-        name: call.name,
-        ok: false,
-        ...(call.callId ? { callId: call.callId } : {}),
-        error: "Action authorization failed"
-      };
-    }
-
-    if (!authorization.allowed) {
-      return {
-        name: call.name,
-        ok: false,
-        ...(call.callId ? { callId: call.callId } : {}),
-        error: authorization.reason
-      };
-    }
-
+    // Register cancellation before authorization. A session may cancel a call
+    // while an asynchronous approval backend is still deciding.
     const controller = new AbortController();
     if (call.callId) {
       this.active.get(call.callId)?.abort();
@@ -118,17 +104,56 @@ export class ActionRuntime {
     }
 
     try {
-      return await route.provider.callTool(call, controller.signal);
-    } catch (error) {
-      return {
-        name: call.name,
-        ok: false,
-        ...(call.callId ? { callId: call.callId } : {}),
-        error:
-          error instanceof Error
-            ? error.message
-            : "Tool execution failed"
-      };
+      let authorization: ActionAuthorizationDecision;
+      try {
+        const decision = this.authorize({
+          call,
+          definition: route.definition,
+          providerId: route.provider.id
+        });
+        authorization = isPromiseLike(decision)
+          ? await decision
+          : decision;
+      } catch {
+        return {
+          name: call.name,
+          ok: false,
+          ...(call.callId ? { callId: call.callId } : {}),
+          error: "Action authorization failed"
+        };
+      }
+
+      if (controller.signal.aborted) {
+        return {
+          name: call.name,
+          ok: false,
+          ...(call.callId ? { callId: call.callId } : {}),
+          error: "Action cancelled"
+        };
+      }
+
+      if (!authorization.allowed) {
+        return {
+          name: call.name,
+          ok: false,
+          ...(call.callId ? { callId: call.callId } : {}),
+          error: authorization.reason
+        };
+      }
+
+      try {
+        return await route.provider.callTool(call, controller.signal);
+      } catch (error) {
+        return {
+          name: call.name,
+          ok: false,
+          ...(call.callId ? { callId: call.callId } : {}),
+          error:
+            error instanceof Error
+              ? error.message
+              : "Tool execution failed"
+        };
+      }
     } finally {
       if (call.callId && this.active.get(call.callId) === controller) {
         this.active.delete(call.callId);
