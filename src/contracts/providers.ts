@@ -1,7 +1,4 @@
-import type {
-  ToolDefinition,
-  ToolResult
-} from "../actions/contracts.js";
+import type { ToolDefinition, ToolResult } from "../actions/contracts.js";
 
 export type AudioChunk = {
   format: "pcm16le";
@@ -40,9 +37,20 @@ export interface BrainProvider {
   complete(request: BrainRequest): Promise<BrainResponse>;
 }
 
+export type SearchResult = {
+  title: string;
+  url: string;
+  snippet?: string;
+};
+
+export type SearchOptions = {
+  limit?: number;
+  signal?: AbortSignal;
+};
+
 export interface SearchProvider {
   readonly id: string;
-  search(query: string): Promise<Array<{ title: string; url: string; snippet?: string }>>;
+  search(query: string, options?: SearchOptions): Promise<SearchResult[]>;
 }
 
 export interface MemoryProvider {
@@ -65,7 +73,9 @@ export type VoiceSessionEvent =
   | { type: "usage"; usage: ProviderUsage }
   | { type: "error"; message: string };
 
-export type VoiceEventHandler = (event: VoiceSessionEvent) => void | Promise<void>;
+export type VoiceEventHandler = (
+  event: VoiceSessionEvent,
+) => void | Promise<void>;
 
 export type VoiceConnectOptions = {
   tools?: ToolDefinition[];

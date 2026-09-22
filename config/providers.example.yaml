@@ -11,10 +11,10 @@ brain:
     - openrouter
 
 search:
-  primary: hermes
-  fallbacks:
-    - searxng
-    - ddgs
+  # Dedicated web search stays separate from the voice/brain provider.
+  # SearXNG must have JSON output enabled in its search.formats settings.
+  primary: searxng
+  fallbacks: []
 
 memory:
   primary: local
@@ -28,6 +28,12 @@ providers:
     # Transcription creates extra provider output/usage. Keep it opt-in.
     input_transcription: false
     output_transcription: false
+
+  searxng:
+    kind: search
+    adapter: searxng
+    base_url: ${SEARXNG_BASE_URL:-http://127.0.0.1:8080}
+    timeout_ms: 8000
 
   deepseek:
     kind: brain

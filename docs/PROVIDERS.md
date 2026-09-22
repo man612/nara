@@ -5,12 +5,15 @@ Provider choice is configuration, not architecture.
 ## Voice
 
 Implemented production adapter:
+
 - `gemini-live`: native Gemini Live audio adapter.
 
 Implemented test adapter:
+
 - `mock`: deterministic test provider.
 
 Planned adapters:
+
 - `openai-live`: native full-duplex GPT-Live adapter.
 - `chained`: STT -> brain -> TTS; inexpensive/self-hostable path, normally less conversational.
 - Pipecat-backed realtime pipelines where their ecosystem is useful.
@@ -27,11 +30,15 @@ Provider model names and base URLs belong in configuration, never source code.
 
 ## Search and tools
 
-Search is a separate capability so a voice or brain provider never forces its search vendor. Hermes, SearXNG, DDGS, Brave, and provider-native search can be adapters.
+Search is a separate capability so a voice or brain provider never forces its search vendor.
 
-Hermes is an optional agent/tool backend. It can own browser automation, skills, search or cron work without being on the raw realtime audio path.
+Implemented production search adapter:
 
-These search/tool adapters are architectural targets; they are not wired into the production runtime yet.
+- `searxng`: JSON Search API adapter with request timeout, Action Runtime cancellation, bounded result count, moderate safe-search, and ordered fallback routing.
+
+A configured search route is exposed as the compact `web_search` Action Runtime tool for firmware and phone voice sessions. If no `search:` route is configured, the tool is not added to the live schema.
+
+Hermes remains an optional agent/tool backend for browser automation, skills, longer research or cron work without being on the raw realtime audio path. DDGS, Brave and provider-native search can be added behind the same `SearchProvider` contract later.
 
 ## Fallback
 

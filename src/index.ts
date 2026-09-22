@@ -30,9 +30,10 @@ import {
   isGatewayDeviceAuthorized,
   type FirmwareSessionFactory,
   type PhoneSessionFactory,
-  type GatewayOptions
+  type GatewayOptions,
 } from "./gateway.js";
-import { createVoiceChain } from "./provider-registry.js";
+import { createSearchChain, createVoiceChain } from "./provider-registry.js";
+import { SearchToolProvider } from "./search/tool-provider.js";
 
 type VoiceMemoryRuntime = {
   store: FilePersonalMemoryStore;
@@ -58,7 +59,7 @@ async function createFirmwareVoiceFactory(
   speakerRuntime: SpeakerRuntime | undefined,
   mediaTools: MediaToolProvider | undefined,
   companion: CompanionRuntime,
-  viewerGrants: DeviceViewerGrantRegistry
+  viewerGrants: DeviceViewerGrantRegistry,
 ): Promise<FirmwareSessionFactory | undefined> {
   const providersFile = process.env.PROVIDERS_FILE;
   if (!providersFile) {
@@ -67,21 +68,22 @@ async function createFirmwareVoiceFactory(
 
   const providersConfig = await loadProvidersConfig(providersFile);
   const voiceProvider = createVoiceChain(providersConfig);
+  const searchProvider = createSearchChain(providersConfig);
+  const searchTools = searchProvider
+    ? new SearchToolProvider(searchProvider)
+    : undefined;
   const bridge = new FirmwareVoiceBridge({
     voiceProvider,
     codecFactory: createLibopusWasmCodecFactory(),
     onUsage: (session, usage) => {
       console.log(
-        `[firmware:${session.sessionId}] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`
+        `[firmware:${session.sessionId}] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`,
       );
-      companion.recordVoiceUsage(
-        "firmware:" + session.sessionId,
-        usage
-      );
+      companion.recordVoiceUsage("firmware:" + session.sessionId, usage);
     },
     onToolCall: (session, event) => {
       console.log(
-        `[firmware:${session.sessionId}] tool call name=${event.name} id=${event.callId ?? "?"}`
+        `[firmware:${session.sessionId}] tool call name=${event.name} id=${event.callId ?? "?"}`,
       );
     },
     ...(speakerRuntime
@@ -92,14 +94,14 @@ async function createFirmwareVoiceFactory(
             if (decision.kind === "known") {
               const person = speakerRuntime.directory.get(decision.personId);
               console.log(
-                `[firmware:${session.sessionId}] speaker=${person?.displayName ?? decision.personId} confidence=${decision.confidence.toFixed(3)} margin=${decision.margin.toFixed(3)} provider=${decision.providerId}`
+                `[firmware:${session.sessionId}] speaker=${person?.displayName ?? decision.personId} confidence=${decision.confidence.toFixed(3)} margin=${decision.margin.toFixed(3)} provider=${decision.providerId}`,
               );
             } else {
               console.log(
-                `[firmware:${session.sessionId}] speaker=guest reason=${decision.reason} provider=${decision.providerId}`
+                `[firmware:${session.sessionId}] speaker=guest reason=${decision.reason} provider=${decision.providerId}`,
               );
             }
-          }
+          },
         }
       : {}),
     createToolProviders: (session) => [
@@ -115,12 +117,13 @@ async function createFirmwareVoiceFactory(
               viewerId: () =>
                 viewerGrants.resolve(session.deviceId)?.personId ??
                 "person:guest",
-              subjectId: voiceMemory.subjectId
-            })
+              subjectId: voiceMemory.subjectId,
+            }),
           ]
         : []),
       ...(mediaTools ? [mediaTools] : []),
-      ...companion.toolProviders(session.deviceId)
+      ...(searchTools ? [searchTools] : []),
+      ...companion.toolProviders(session.deviceId),
     ],
     onControlReady: (session, control) => {
       companion.registerVoiceControl(session, control);
@@ -132,25 +135,30 @@ async function createFirmwareVoiceFactory(
       companion.handleOutputTranscript(session, text, final),
     onLatencySample: (sample) => {
       companion.recordLatency(sample);
-    }
+    },
   });
 
-  console.log(
-    `Voice route:        ${voiceProvider.id} (${providersFile})`
-  );
+  console.log(`Voice route:        ${voiceProvider.id} (${providersFile})`);
+  if (searchProvider) {
+    console.log(`Search route:       ${searchProvider.id}`);
+  }
   return bridge.createSession;
 }
 
 async function createPhoneVoiceFactory(
   voiceMemory: VoiceMemoryRuntime | undefined,
   mediaTools: MediaToolProvider | undefined,
-  companion: CompanionRuntime
+  companion: CompanionRuntime,
 ): Promise<PhoneSessionFactory | undefined> {
   const providersFile = process.env.PROVIDERS_FILE;
   if (!providersFile) return undefined;
 
   const providersConfig = await loadProvidersConfig(providersFile);
   const voiceProvider = createVoiceChain(providersConfig);
+  const searchProvider = createSearchChain(providersConfig);
+  const searchTools = searchProvider
+    ? new SearchToolProvider(searchProvider)
+    : undefined;
   const bridge = new PhoneVoiceBridge({
     voiceProvider,
     createToolProviders: (context) => [
@@ -161,22 +169,20 @@ async function createPhoneVoiceFactory(
             // voice remains guest/public just like physical firmware.
             new PersonalMemoryToolProvider(voiceMemory.store, {
               viewerId: context.viewerId ?? "person:guest",
-              subjectId: voiceMemory.subjectId
-            })
+              subjectId: voiceMemory.subjectId,
+            }),
           ]
         : []),
       ...(mediaTools ? [mediaTools] : []),
-      ...companion.toolProviders()
+      ...(searchTools ? [searchTools] : []),
+      ...companion.toolProviders(),
     ],
     onUsage: (usage) => {
       console.log(
-        `[phone] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`
+        `[phone] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`,
       );
-      companion.recordVoiceUsage(
-        "phone:" + voiceProvider.id,
-        usage
-      );
-    }
+      companion.recordVoiceUsage("phone:" + voiceProvider.id, usage);
+    },
   });
   return bridge.createSession;
 }
@@ -187,7 +193,7 @@ async function main(): Promise<void> {
   const deviceRegistryFile =
     process.env.NARA_DEVICE_REGISTRY_FILE ?? "data/device-registry.json";
   const deviceRegistry = await DeviceRegistry.open({
-    filePath: deviceRegistryFile
+    filePath: deviceRegistryFile,
   });
 
   const personalMemoryFile = process.env.NARA_PERSONAL_MEMORY_FILE;
@@ -199,7 +205,7 @@ async function main(): Promise<void> {
     personalMemoryStore && memorySubjectId
       ? {
           store: personalMemoryStore,
-          subjectId: memorySubjectId
+          subjectId: memorySubjectId,
         }
       : undefined;
 
@@ -218,7 +224,7 @@ async function main(): Promise<void> {
   if (speakerConfigPresent) {
     if (!personDirectory || !speakerEndpoint) {
       throw new Error(
-        "Speaker identity requires NARA_PEOPLE_FILE and NARA_SPEAKER_ID_URL"
+        "Speaker identity requires NARA_PEOPLE_FILE and NARA_SPEAKER_ID_URL",
       );
     }
 
@@ -226,25 +232,25 @@ async function main(): Promise<void> {
     const provider = new HttpSpeakerIdentityProvider(speakerEndpoint, {
       ...(process.env.NARA_SPEAKER_SERVICE_TOKEN
         ? { bearerToken: process.env.NARA_SPEAKER_SERVICE_TOKEN }
-        : {})
+        : {}),
     });
     speakerRuntime = {
       directory,
       service: new SpeakerIdentityService(provider, directory, {
         minConfidence: requiredNumber("NARA_SPEAKER_MIN_CONFIDENCE"),
         minMargin: requiredNumber("NARA_SPEAKER_MIN_MARGIN"),
-        minAudioMs: requiredNumber("NARA_SPEAKER_MIN_AUDIO_MS")
-      })
+        minAudioMs: requiredNumber("NARA_SPEAKER_MIN_AUDIO_MS"),
+      }),
     };
   }
 
   const spotifyValues = {
     clientId: process.env.SPOTIFY_CLIENT_ID,
     clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-    refreshToken: process.env.SPOTIFY_REFRESH_TOKEN
+    refreshToken: process.env.SPOTIFY_REFRESH_TOKEN,
   };
   const spotifyConfigured = Object.values(spotifyValues).some(
-    (value) => value !== undefined
+    (value) => value !== undefined,
   );
   let mediaTools: MediaToolProvider | undefined;
   if (spotifyConfigured) {
@@ -254,15 +260,15 @@ async function main(): Promise<void> {
       !spotifyValues.refreshToken
     ) {
       throw new Error(
-        "Spotify media requires SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, and SPOTIFY_REFRESH_TOKEN"
+        "Spotify media requires SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, and SPOTIFY_REFRESH_TOKEN",
       );
     }
     mediaTools = new MediaToolProvider(
       new SpotifyWebApiProvider({
         clientId: spotifyValues.clientId,
         clientSecret: spotifyValues.clientSecret,
-        refreshToken: spotifyValues.refreshToken
-      })
+        refreshToken: spotifyValues.refreshToken,
+      }),
     );
   }
 
@@ -275,7 +281,7 @@ async function main(): Promise<void> {
     process.env.NARA_HUMAN_CREDENTIAL_REGISTRY_FILE !== undefined;
   if (humanAuthConfigured && (!humanAdminToken || !personDirectory)) {
     throw new Error(
-      "Human viewer auth requires NARA_HUMAN_AUTH_ADMIN_TOKEN and NARA_PEOPLE_FILE"
+      "Human viewer auth requires NARA_HUMAN_AUTH_ADMIN_TOKEN and NARA_PEOPLE_FILE",
     );
   }
   const humanRegistry =
@@ -284,9 +290,7 @@ async function main(): Promise<void> {
       : undefined;
 
   const passkeyRpId = process.env.NARA_PASSKEY_RP_ID?.trim();
-  const passkeyOrigins = (
-    process.env.NARA_PASSKEY_ORIGINS ?? ""
-  )
+  const passkeyOrigins = (process.env.NARA_PASSKEY_ORIGINS ?? "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
@@ -305,7 +309,7 @@ async function main(): Promise<void> {
   ) {
     throw new Error(
       "Passkeys require NARA_PASSKEY_RP_ID, NARA_PASSKEY_ORIGINS, " +
-        "NARA_HUMAN_AUTH_ADMIN_TOKEN, and NARA_PEOPLE_FILE"
+        "NARA_HUMAN_AUTH_ADMIN_TOKEN, and NARA_PEOPLE_FILE",
     );
   }
 
@@ -317,14 +321,10 @@ async function main(): Promise<void> {
     humanAdminToken &&
     personDirectory
       ? await PasskeyRegistry.open({
-          filePath:
-            process.env.NARA_PASSKEY_FILE ??
-            "data/passkeys.json",
+          filePath: process.env.NARA_PASSKEY_FILE ?? "data/passkeys.json",
           rpId: passkeyRpId,
-          rpName:
-            process.env.NARA_PASSKEY_RP_NAME?.trim() ||
-            "Nara",
-          origins: passkeyOrigins
+          rpName: process.env.NARA_PASSKEY_RP_NAME?.trim() || "Nara",
+          origins: passkeyOrigins,
         })
       : undefined;
 
@@ -336,7 +336,7 @@ async function main(): Promise<void> {
     speakerRuntime,
     mediaTools,
     companion,
-    viewerGrants
+    viewerGrants,
   );
   const phoneToken = process.env.NARA_PHONE_BRIDGE_TOKEN;
   const phoneSessionFactory = phoneToken
@@ -375,7 +375,7 @@ async function main(): Promise<void> {
     throw new Error(
       "Remote personal content requires NARA_CONTENT_ADMIN_TOKEN, " +
         "NARA_CONTENT_AUTHOR_SUBJECT_ID, NARA_CONTENT_ALLOWED_VIEWER_IDS, " +
-        "and NARA_PERSONAL_MEMORY_FILE"
+        "and NARA_PERSONAL_MEMORY_FILE",
     );
   }
 
@@ -397,7 +397,7 @@ async function main(): Promise<void> {
     throw new Error(
       "Offline capsule export requires NARA_OFFLINE_CAPSULE_ADMIN_TOKEN, " +
         "NARA_OFFLINE_CAPSULE_RECIPIENT_ID, NARA_OFFLINE_CAPSULE_SUBJECT_ID, " +
-        "and NARA_PERSONAL_MEMORY_FILE"
+        "and NARA_PERSONAL_MEMORY_FILE",
     );
   }
 
@@ -406,17 +406,17 @@ async function main(): Promise<void> {
     companion.networkDiagnosticsHandler((request) =>
       isGatewayDeviceAuthorized(request, {
         ...(deviceToken ? { deviceToken } : {}),
-        deviceRegistry
-      })
-    )
+        deviceRegistry,
+      }),
+    ),
   );
   httpHandlers.push(
     companion.remoteInboxHandler((request) =>
       isGatewayDeviceAuthorized(request, {
         ...(deviceToken ? { deviceToken } : {}),
-        deviceRegistry
-      })
-    )
+        deviceRegistry,
+      }),
+    ),
   );
   if (
     capsuleToken &&
@@ -429,8 +429,8 @@ async function main(): Promise<void> {
         store: personalMemoryStore,
         bearerToken: capsuleToken,
         recipientPersonId: capsuleRecipientId,
-        subjectPersonId: capsuleSubjectId
-      })
+        subjectPersonId: capsuleSubjectId,
+      }),
     );
   }
   if (humanRegistry && humanAdminToken && personDirectory) {
@@ -438,16 +438,11 @@ async function main(): Promise<void> {
       createHumanAuthHttpHandler({
         registry: humanRegistry,
         directory: personDirectory,
-        adminToken: humanAdminToken
-      })
+        adminToken: humanAdminToken,
+      }),
     );
   }
-  if (
-    passkeys &&
-    humanRegistry &&
-    humanAdminToken &&
-    personDirectory
-  ) {
+  if (passkeys && humanRegistry && humanAdminToken && personDirectory) {
     httpHandlers.push(
       createPasskeyHttpHandler({
         passkeys,
@@ -458,11 +453,10 @@ async function main(): Promise<void> {
         adminToken: humanAdminToken,
         ...(process.env.NARA_COMPANION_DEVICE_ID?.trim()
           ? {
-              allowedDeviceId:
-                process.env.NARA_COMPANION_DEVICE_ID.trim()
+              allowedDeviceId: process.env.NARA_COMPANION_DEVICE_ID.trim(),
             }
-          : {})
-      })
+          : {}),
+      }),
     );
   }
 
@@ -472,13 +466,13 @@ async function main(): Promise<void> {
       allowedViewerIds: contentAllowedViewerIds,
       defaultViewerIds: contentDefaultViewerIds,
       allowPublic:
-        process.env.NARA_CONTENT_ALLOW_PUBLIC?.toLowerCase() === "true"
+        process.env.NARA_CONTENT_ALLOW_PUBLIC?.toLowerCase() === "true",
     });
     httpHandlers.push(
       createPersonalContentHttpHandler({
         service: contentService,
-        bearerToken: contentToken
-      })
+        bearerToken: contentToken,
+      }),
     );
   }
 
@@ -487,12 +481,12 @@ async function main(): Promise<void> {
     const otaChannels = await DeviceUpdateChannels.open({
       filePath:
         process.env.NARA_OTA_CHANNELS_FILE ??
-        "data/device-update-channels.json"
+        "data/device-update-channels.json",
     });
     const otaCatalog = new GitHubReleaseOtaCatalog(otaRepository, {
       ...(process.env.NARA_OTA_GITHUB_TOKEN
         ? { githubToken: process.env.NARA_OTA_GITHUB_TOKEN }
-        : {})
+        : {}),
     });
     httpHandlers.push(
       createOtaHttpHandler({
@@ -501,12 +495,12 @@ async function main(): Promise<void> {
         authorizeDevice: (request) =>
           isGatewayDeviceAuthorized(request, {
             ...(deviceToken ? { deviceToken } : {}),
-            deviceRegistry
+            deviceRegistry,
           }),
         ...(process.env.NARA_OTA_ADMIN_TOKEN
           ? { adminToken: process.env.NARA_OTA_ADMIN_TOKEN }
-          : {})
-      })
+          : {}),
+      }),
     );
   }
 
@@ -527,15 +521,15 @@ async function main(): Promise<void> {
                         viewerId: viewer.personId,
                         ...(viewer.accountId
                           ? { accountId: viewer.accountId }
-                          : {})
+                          : {}),
                       }
                     : undefined;
-                }
+                },
               }
-            : {})
+            : {}),
         }
       : {}),
-    ...(httpHandlers.length > 0 ? { httpHandlers } : {})
+    ...(httpHandlers.length > 0 ? { httpHandlers } : {}),
   };
   const { server } = createGatewayServer(options);
 
@@ -548,22 +542,22 @@ async function main(): Promise<void> {
     }
     if (humanRegistry) {
       console.log(
-        `Human viewer auth: credentials=${humanRegistryFile} short-lived phone sessions enabled`
+        `Human viewer auth: credentials=${humanRegistryFile} short-lived phone sessions enabled`,
       );
     }
     if (passkeys && passkeyRpId) {
       console.log(
-        `Passkeys:          rp=${passkeyRpId} origins=${passkeyOrigins.join(",")} physical viewer grants enabled`
+        `Passkeys:          rp=${passkeyRpId} origins=${passkeyOrigins.join(",")} physical viewer grants enabled`,
       );
     }
     if (voiceMemory) {
       console.log(
-        `Voice memory:      guest/public scope subject=${voiceMemory.subjectId} file=${personalMemoryFile}`
+        `Voice memory:      guest/public scope subject=${voiceMemory.subjectId} file=${personalMemoryFile}`,
       );
     }
     if (speakerRuntime && peopleFile) {
       console.log(
-        `Speaker identity:  profiles=${speakerRuntime.directory.getSpeakerCandidates().length} primary=${speakerRuntime.directory.getPrimary().displayName} file=${peopleFile}`
+        `Speaker identity:  profiles=${speakerRuntime.directory.getSpeakerCandidates().length} primary=${speakerRuntime.directory.getPrimary().displayName} file=${peopleFile}`,
       );
     }
     if (mediaTools) {
@@ -571,12 +565,12 @@ async function main(): Promise<void> {
     }
     if (capsuleToken && capsuleRecipientId && capsuleSubjectId) {
       console.log(
-        `Offline capsule:   subject=${capsuleSubjectId} recipient=${capsuleRecipientId}`
+        `Offline capsule:   subject=${capsuleSubjectId} recipient=${capsuleRecipientId}`,
       );
     }
     if (contentToken && contentSubjectId) {
       console.log(
-        `Personal content:  scoped author subject=${contentSubjectId} viewers=${contentAllowedViewerIds.join(",")}`
+        `Personal content:  scoped author subject=${contentSubjectId} viewers=${contentAllowedViewerIds.join(",")}`,
       );
     }
     if (otaRepository) {
@@ -589,12 +583,12 @@ async function main(): Promise<void> {
 
     if (!deviceToken) {
       console.warn(
-        "NARA_DEVICE_TOKEN is not set; /device accepts unauthenticated clients"
+        "NARA_DEVICE_TOKEN is not set; /device accepts unauthenticated clients",
       );
     }
     if (!firmwareSessionFactory) {
       console.warn(
-        "PROVIDERS_FILE is not set; physical firmware voice sessions are disabled"
+        "PROVIDERS_FILE is not set; physical firmware voice sessions are disabled",
       );
     }
   });

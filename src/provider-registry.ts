@@ -1,28 +1,36 @@
 import type {
   BrainProvider,
-  VoiceProvider
+  SearchProvider,
+  VoiceProvider,
 } from "./contracts/providers.js";
-import type { ProviderDefinition, ProvidersConfig } from "./config/providers.js";
+import type {
+  ProviderDefinition,
+  ProvidersConfig,
+} from "./config/providers.js";
 import { FallbackBrainProvider } from "./providers/brain/fallback.js";
 import { OpenAICompatibleBrain } from "./providers/brain/openai-compatible.js";
+import { FallbackSearchProvider } from "./providers/search/fallback.js";
+import { SearxngSearchProvider } from "./providers/search/searxng.js";
 import { FallbackVoiceProvider } from "./providers/voice/fallback.js";
 import { GeminiLiveVoiceProvider } from "./providers/voice/gemini-live.js";
 
-function providerApiKey(
-  definition: ProviderDefinition
-): string | undefined {
+function providerApiKey(definition: ProviderDefinition): string | undefined {
   return definition.api_key_env
     ? process.env[definition.api_key_env]
     : undefined;
 }
 
-function createBrainProvider(id: string, definition: ProviderDefinition): BrainProvider {
+function createBrainProvider(
+  id: string,
+  definition: ProviderDefinition,
+): BrainProvider {
   if (definition.kind !== "brain") {
     throw new Error(`Provider ${id} is not a brain provider`);
   }
 
   if (definition.adapter === "openai-compatible") {
-    if (!definition.base_url) throw new Error(`Provider ${id} is missing base_url`);
+    if (!definition.base_url)
+      throw new Error(`Provider ${id} is missing base_url`);
     if (!definition.model) throw new Error(`Provider ${id} is missing model`);
 
     const apiKey = providerApiKey(definition);
@@ -34,7 +42,7 @@ function createBrainProvider(id: string, definition: ProviderDefinition): BrainP
       ...(apiKey ? { apiKey } : {}),
       ...(definition.timeout_ms !== undefined
         ? { timeoutMs: definition.timeout_ms }
-        : {})
+        : {}),
     });
   }
 
@@ -43,7 +51,7 @@ function createBrainProvider(id: string, definition: ProviderDefinition): BrainP
 
 export function createVoiceProvider(
   id: string,
-  definition: ProviderDefinition
+  definition: ProviderDefinition,
 ): VoiceProvider {
   if (definition.kind !== "voice") {
     throw new Error(`Provider ${id} is not a voice provider`);
@@ -54,7 +62,7 @@ export function createVoiceProvider(
     const apiKey = providerApiKey(definition);
     if (!apiKey) {
       throw new Error(
-        `Provider ${id} is missing API key from ${definition.api_key_env ?? "api_key_env"}`
+        `Provider ${id} is missing API key from ${definition.api_key_env ?? "api_key_env"}`,
       );
     }
 
@@ -62,15 +70,59 @@ export function createVoiceProvider(
       apiKey,
       model: definition.model,
       inputTranscription: definition.input_transcription === true,
-      outputTranscription: definition.output_transcription === true
+      outputTranscription: definition.output_transcription === true,
     });
   }
 
   throw new Error(`Unsupported voice adapter: ${definition.adapter}`);
 }
 
+export function createSearchProvider(
+  id: string,
+  definition: ProviderDefinition,
+): SearchProvider {
+  if (definition.kind !== "search") {
+    throw new Error(`Provider ${id} is not a search provider`);
+  }
+
+  if (definition.adapter === "searxng") {
+    if (!definition.base_url) {
+      throw new Error(`Provider ${id} is missing base_url`);
+    }
+    return new SearxngSearchProvider(id, {
+      baseUrl: definition.base_url,
+      ...(definition.timeout_ms !== undefined
+        ? { timeoutMs: definition.timeout_ms }
+        : {}),
+    });
+  }
+
+  throw new Error(`Unsupported search adapter: ${definition.adapter}`);
+}
+
+export function createSearchChain(
+  config: ProvidersConfig,
+): SearchProvider | undefined {
+  if (!config.search) return undefined;
+
+  const ids = [config.search.primary, ...config.search.fallbacks];
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Search provider route contains duplicate provider IDs");
+  }
+
+  const providers = ids.map((id) => {
+    const definition = config.providers[id];
+    if (!definition) throw new Error(`Unknown provider: ${id}`);
+    return createSearchProvider(id, definition);
+  });
+
+  return providers.length === 1
+    ? providers[0]!
+    : new FallbackSearchProvider("search-fallback", providers);
+}
+
 export function createPrimaryVoiceProvider(
-  config: ProvidersConfig
+  config: ProvidersConfig,
 ): VoiceProvider {
   const id = config.voice.primary;
   const definition = config.providers[id];
@@ -94,7 +146,7 @@ export function createVoiceChain(config: ProvidersConfig): VoiceProvider {
 
     return {
       id,
-      create: () => createVoiceProvider(id, definition)
+      create: () => createVoiceProvider(id, definition),
     };
   });
 
