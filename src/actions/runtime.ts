@@ -176,9 +176,10 @@ export class ActionRuntime {
       }
     }
 
-    if (this.routes.size > this.maxExposedTools) {
+    const exposedCount = this.listTools().length;
+    if (exposedCount > this.maxExposedTools) {
       throw new Error(
-        `Action runtime exposes ${this.routes.size} tools, above the configured limit of ${this.maxExposedTools}`
+        `Action runtime exposes ${exposedCount} tools, above the configured limit of ${this.maxExposedTools}`
       );
     }
   }
