@@ -195,6 +195,10 @@ export function isGatewayDeviceAuthorized(
   const authorization = request.headers.authorization;
   const deviceId = headerString(request.headers["device-id"]);
 
+  if (options.deviceRegistry && !options.deviceRegistry.isHealthy()) {
+    return false;
+  }
+
   if (deviceId && options.deviceRegistry) {
     const state = options.deviceRegistry.getDeviceState(deviceId);
 
