@@ -1,3 +1,7 @@
+import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import type { IncomingMessage } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
@@ -5,6 +9,7 @@ import WebSocket from "ws";
 import { DeviceRegistry } from "../src/device/registry.js";
 import {
   createGatewayServer,
+  isGatewayDeviceAuthorized,
   type FirmwareSessionHandler,
   type FirmwareSessionInfo
 } from "../src/gateway.js";
@@ -134,6 +139,38 @@ describe("per-device gateway authentication", () => {
       await closed;
     } finally {
       await closeGateway(gateway);
+    }
+  });
+
+  it("fails closed instead of falling back to a fleet token when registry storage is unhealthy", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "nara-device-auth-"));
+    const displaced = `${directory}-durable`;
+    const filePath = join(directory, "devices.json");
+
+    try {
+      const registry = await DeviceRegistry.open({ filePath });
+      await registry.registerUnclaimedDevice({ deviceId: "device-a" });
+
+      await rename(directory, displaced);
+      await writeFile(directory, "blocker", "utf8");
+      await expect(registry.beginClaim("device-a")).rejects.toThrow();
+
+      const request = {
+        headers: {
+          "device-id": "device-a",
+          authorization: "Bearer legacy-global"
+        }
+      } as IncomingMessage;
+
+      expect(
+        isGatewayDeviceAuthorized(request, {
+          deviceToken: "legacy-global",
+          deviceRegistry: registry
+        })
+      ).toBe(false);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+      await rm(displaced, { recursive: true, force: true });
     }
   });
 
