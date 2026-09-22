@@ -37,7 +37,8 @@ export class ActionRuntime {
   private constructor(
     private readonly providers: ToolProvider[],
     private readonly maxExposedTools: number,
-    private readonly authorize: ActionAuthorizer
+    private readonly authorize: ActionAuthorizer,
+    private readonly hasExplicitAuthorizer: boolean
   ) {}
 
   static async create(
@@ -48,14 +49,21 @@ export class ActionRuntime {
       providers,
       options.maxExposedTools ?? 20,
       options.authorize ??
-        ((request) => defaultAuthorize(request.definition))
+        ((request) => defaultAuthorize(request.definition)),
+      options.authorize !== undefined
     );
     await runtime.loadRoutes();
     return runtime;
   }
 
   listTools(): ToolDefinition[] {
-    return [...this.routes.values()].map(({ definition }) => definition);
+    return [...this.routes.values()]
+      .map(({ definition }) => definition)
+      .filter(
+        (definition) =>
+          definition.effect !== "sensitive" ||
+          this.hasExplicitAuthorizer
+      );
   }
 
   async execute(call: ToolCall): Promise<ToolResult> {
