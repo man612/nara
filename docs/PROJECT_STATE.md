@@ -4,7 +4,7 @@ This file is Nara's durable project checkpoint for humans and coding agents.
 
 Read it after `docs/REPO_MAP.md`. Update it after every meaningful implementation batch. Do not rely on chat history as the only source of truth.
 
-Last reviewed: 2026-09-21
+Last reviewed: 2026-09-22
 
 ## Product direction
 
@@ -42,6 +42,7 @@ Real names, private biography, relationship details, credentials, recordings and
 - local daily soft budget for provider-reported realtime voice tokens;
 - measured voice latency telemetry with bounded p50/p95 summaries;
 - optional Hermes Runs API delegation for long agent work;
+- provider-neutral dedicated web search with a production SearXNG adapter, ordered fallback routing, bounded/cancellable results and a compact `web_search` voice tool;
 - allowlisted Telegram bridge with ask/say/notify/status/agent commands;
 - durable per-device remote inbox with TTL, leasing, retry and authenticated device poll/ack;
 - idle remote delivery that keeps queued voice prompts server-side and does not require an always-on realtime model session;
@@ -270,7 +271,7 @@ Hermes Runs API delegation is now implemented as an optional backend and does
 not sit in the realtime voice critical path. Remaining ecosystem expansion is
 non-blocking:
 
-- dedicated web/search adapters beyond delegated Hermes research;
+- additional search adapters beyond the implemented SearXNG path where deployment needs them;
 - additional voice providers such as GPT Live/chained local voice;
 - reminders/calendar/home automation connectors;
 - richer local-network STT/LLM/TTS.

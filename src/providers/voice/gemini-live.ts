@@ -453,9 +453,10 @@ class GeminiLiveVoiceSession implements VoiceSession {
             name: tool.name,
             description: tool.description,
             parametersJsonSchema: tool.inputSchema,
-            ...(tool.behavior === "non_blocking"
-              ? { behavior: "NON_BLOCKING" }
-              : {})
+            behavior:
+              tool.behavior === "non_blocking"
+                ? "NON_BLOCKING"
+                : "BLOCKING"
           }))
         }
       ];
