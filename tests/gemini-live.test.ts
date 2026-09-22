@@ -119,6 +119,19 @@ describe("Gemini Live provider", () => {
           required: ["volume"]
         },
         effect: "write"
+      },
+      {
+        name: "notify_later",
+        description: "Queue a non-blocking notification.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            text: { type: "string" }
+          },
+          required: ["text"]
+        },
+        effect: "write",
+        behavior: "non_blocking"
       }
     ];
     const { session, socket } = await connectHarness(
@@ -135,7 +148,14 @@ describe("Gemini Live provider", () => {
             {
               name: "device_set_volume",
               description: "Set speaker volume.",
-              parametersJsonSchema: tools[0]!.inputSchema
+              parametersJsonSchema: tools[0]!.inputSchema,
+              behavior: "BLOCKING"
+            },
+            {
+              name: "notify_later",
+              description: "Queue a non-blocking notification.",
+              parametersJsonSchema: tools[1]!.inputSchema,
+              behavior: "NON_BLOCKING"
             }
           ]
         }
