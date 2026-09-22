@@ -15,7 +15,8 @@ voice / brain provider
         +-- PersonalMemoryToolProvider --> viewer-filtered local memory
         +-- HermesAgentToolProvider --> optional Hermes Runs delegation
         +-- MediaToolProvider / CompanionStatusToolProvider
-        +-- future dedicated SearchProvider / external MCP
+        +-- SearchToolProvider --> SearchProvider --> SearXNG / future adapters
+        +-- future external MCP
         |
         | ToolResult
         v
@@ -66,4 +67,4 @@ Tool execution is intentionally not awaited inside the serialized voice-event ch
 
 Do not expose every possible tool to every live session.
 
-The action runtime has an explicit tool-count guard and the physical-device catalog is intentionally compact. Memory, media, companion-status and optional Hermes tools are already selected through the same provider boundary. Future dedicated search, automation, and external MCP tools should likewise be selected per session/intent rather than permanently injected into the realtime voice context.
+The action runtime has an explicit tool-count guard and the physical-device catalog is intentionally compact. Memory, media, companion-status, dedicated web search and optional Hermes tools are selected through the same provider boundary. Search is exposed only when a `search:` route exists in provider configuration, so unused search schemas do not permanently consume realtime voice context. Future automation and external MCP tools should follow the same per-session/intent rule.

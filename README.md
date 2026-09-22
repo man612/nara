@@ -47,9 +47,11 @@ microphone/speaker streaming.
   through a compact firmware MCP compatibility boundary.
 - Agent/tools: Hermes Agent delegation is implemented and remains optional; it
   can run on a VPS or managed service.
-- Search: delegated Hermes research is implemented; dedicated SearchProvider
-  adapters such as SearXNG, DDGS, Brave, or provider-native search remain
-  optional future work.
+- Search: a dedicated provider-neutral SearchProvider path is implemented.
+  SearXNG is the first production adapter, exposed to voice sessions as a
+  cancellable `web_search` tool. Hermes remains available for longer delegated
+  research/browser work; DDGS, Brave, and provider-native search can be added
+  behind the same contract later.
 - Memory: local-first personal memory is implemented; larger stores such as
   PostgreSQL/pgvector can be added
   when deployment needs them.

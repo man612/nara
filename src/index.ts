@@ -32,7 +32,11 @@ import {
   type PhoneSessionFactory,
   type GatewayOptions
 } from "./gateway.js";
-import { createVoiceChain } from "./provider-registry.js";
+import {
+  createSearchChain,
+  createVoiceChain
+} from "./provider-registry.js";
+import { SearchToolProvider } from "./search/tool-provider.js";
 
 type VoiceMemoryRuntime = {
   store: FilePersonalMemoryStore;
@@ -67,6 +71,10 @@ async function createFirmwareVoiceFactory(
 
   const providersConfig = await loadProvidersConfig(providersFile);
   const voiceProvider = createVoiceChain(providersConfig);
+  const searchProvider = createSearchChain(providersConfig);
+  const searchTools = searchProvider
+    ? new SearchToolProvider(searchProvider)
+    : undefined;
   const bridge = new FirmwareVoiceBridge({
     voiceProvider,
     codecFactory: createLibopusWasmCodecFactory(),
@@ -120,6 +128,7 @@ async function createFirmwareVoiceFactory(
           ]
         : []),
       ...(mediaTools ? [mediaTools] : []),
+      ...(searchTools ? [searchTools] : []),
       ...companion.toolProviders(session.deviceId)
     ],
     onControlReady: (session, control) => {
@@ -138,6 +147,9 @@ async function createFirmwareVoiceFactory(
   console.log(
     `Voice route:        ${voiceProvider.id} (${providersFile})`
   );
+  if (searchProvider) {
+    console.log(`Search route:       ${searchProvider.id}`);
+  }
   return bridge.createSession;
 }
 
@@ -151,6 +163,10 @@ async function createPhoneVoiceFactory(
 
   const providersConfig = await loadProvidersConfig(providersFile);
   const voiceProvider = createVoiceChain(providersConfig);
+  const searchProvider = createSearchChain(providersConfig);
+  const searchTools = searchProvider
+    ? new SearchToolProvider(searchProvider)
+    : undefined;
   const bridge = new PhoneVoiceBridge({
     voiceProvider,
     createToolProviders: (context) => [
@@ -166,6 +182,7 @@ async function createPhoneVoiceFactory(
           ]
         : []),
       ...(mediaTools ? [mediaTools] : []),
+      ...(searchTools ? [searchTools] : []),
       ...companion.toolProviders()
     ],
     onUsage: (usage) => {

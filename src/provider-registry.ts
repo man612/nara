@@ -1,10 +1,13 @@
 import type {
   BrainProvider,
+  SearchProvider,
   VoiceProvider
 } from "./contracts/providers.js";
 import type { ProviderDefinition, ProvidersConfig } from "./config/providers.js";
 import { FallbackBrainProvider } from "./providers/brain/fallback.js";
 import { OpenAICompatibleBrain } from "./providers/brain/openai-compatible.js";
+import { FallbackSearchProvider } from "./providers/search/fallback.js";
+import { SearxngSearchProvider } from "./providers/search/searxng.js";
 import { FallbackVoiceProvider } from "./providers/voice/fallback.js";
 import { GeminiLiveVoiceProvider } from "./providers/voice/gemini-live.js";
 
@@ -67,6 +70,50 @@ export function createVoiceProvider(
   }
 
   throw new Error(`Unsupported voice adapter: ${definition.adapter}`);
+}
+
+export function createSearchProvider(
+  id: string,
+  definition: ProviderDefinition
+): SearchProvider {
+  if (definition.kind !== "search") {
+    throw new Error(`Provider ${id} is not a search provider`);
+  }
+
+  if (definition.adapter === "searxng") {
+    if (!definition.base_url) {
+      throw new Error(`Provider ${id} is missing base_url`);
+    }
+    return new SearxngSearchProvider(id, {
+      baseUrl: definition.base_url,
+      ...(definition.timeout_ms !== undefined
+        ? { timeoutMs: definition.timeout_ms }
+        : {})
+    });
+  }
+
+  throw new Error(`Unsupported search adapter: ${definition.adapter}`);
+}
+
+export function createSearchChain(
+  config: ProvidersConfig
+): SearchProvider | undefined {
+  if (!config.search) return undefined;
+
+  const ids = [config.search.primary, ...config.search.fallbacks];
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Search provider route contains duplicate provider IDs");
+  }
+
+  const providers = ids.map((id) => {
+    const definition = config.providers[id];
+    if (!definition) throw new Error(`Unknown provider: ${id}`);
+    return createSearchProvider(id, definition);
+  });
+
+  return providers.length === 1
+    ? providers[0]!
+    : new FallbackSearchProvider("search-fallback", providers);
 }
 
 export function createPrimaryVoiceProvider(
