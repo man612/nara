@@ -94,8 +94,7 @@ function serializeBrainMessage(message: BrainMessage): Record<string, unknown> {
     return {
       role: "tool",
       content: message.content,
-      tool_call_id: message.toolCallId,
-      name: message.name
+      tool_call_id: message.toolCallId
     };
   }
 
