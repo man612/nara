@@ -45,11 +45,13 @@ microphone/speaker streaming.
   local gateways can share one adapter.
 - Actions: provider-neutral routing/cancellation; physical-device tools execute
   through a compact firmware MCP compatibility boundary.
-- Agent/tools: Hermes Agent is optional and can run on a VPS or managed
-  service.
-- Search: Hermes, SearXNG, DDGS, Brave, provider-native search, or future
-  adapters.
-- Memory: local-first; larger stores such as PostgreSQL/pgvector can be added
+- Agent/tools: Hermes Agent delegation is implemented and remains optional; it
+  can run on a VPS or managed service.
+- Search: delegated Hermes research is implemented; dedicated SearchProvider
+  adapters such as SearXNG, DDGS, Brave, or provider-native search remain
+  optional future work.
+- Memory: local-first personal memory is implemented; larger stores such as
+  PostgreSQL/pgvector can be added
   when deployment needs them.
 - Device: the first target is Waveshare ESP32-S3-Touch-LCD-1.85B through the
   standalone nara-firmware repository.
@@ -129,8 +131,9 @@ The standalone Waveshare 1.85B firmware builds in full ESP-IDF CI and includes
 Nara's parametric face, local audio-driven mouth motion, CST816S touch input,
 touch-driven gaze, touch/IMU physical reflexes, flip/shake/spin classifiers,
 persistent custom reaction packs, RTC-backed clock/timer/alarm foundations,
-battery policy, saved-Wi-Fi recovery, useful no-network idle behavior,
-authenticated OTA, a recipient-safe offline personal capsule reader, the
+battery policy, saved-Wi-Fi recovery, DPP QR Wi-Fi commissioning with an
+explicit physical fallback, useful no-network idle behavior, authenticated
+OTA, a recipient-safe offline personal capsule reader, the
 token-free Nara Says physical minigame, and lightweight network diagnostics.
 
 A separate authenticated browser phone-audio bridge is implemented. A phone
