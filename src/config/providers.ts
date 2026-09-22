@@ -13,7 +13,13 @@ const providerSchema = z.object({
   model: z.string().optional(),
   base_url: z.string().optional(),
   api_key_env: z.string().optional(),
-  timeout_ms: z.number().int().min(250).max(120_000).optional()
+  timeout_ms: z.number().int().min(250).max(120_000).optional(),
+  stt_provider: z.string().optional(),
+  tts_provider: z.string().optional(),
+  voice: z.string().optional(),
+  language: z.string().optional(),
+  sample_rate: z.number().int().min(8_000).max(192_000).optional(),
+  system_instruction: z.string().optional()
 }).passthrough();
 
 const configSchema = z.object({
