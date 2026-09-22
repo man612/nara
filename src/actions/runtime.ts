@@ -1,4 +1,6 @@
 import type {
+  ActionAuthorizer,
+  ActionAuthorizationDecision,
   ToolCall,
   ToolDefinition,
   ToolProvider,
@@ -10,6 +12,32 @@ type ToolRoute = {
   definition: ToolDefinition;
 };
 
+export type ActionRuntimeOptions = {
+  maxExposedTools?: number;
+  authorize?: ActionAuthorizer;
+};
+
+function defaultAuthorize(
+  definition: ToolDefinition
+): ActionAuthorizationDecision {
+  if (definition.effect === "sensitive") {
+    return {
+      allowed: false,
+      reason: "Sensitive action requires explicit authorization"
+    };
+  }
+  return { allowed: true };
+}
+
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "then" in value &&
+    typeof (value as Promise<T>).then === "function"
+  );
+}
+
 export class ActionRuntime {
   private readonly routes = new Map<string, ToolRoute>();
   private readonly active = new Map<string, AbortController>();
@@ -17,23 +45,34 @@ export class ActionRuntime {
 
   private constructor(
     private readonly providers: ToolProvider[],
-    private readonly maxExposedTools: number
+    private readonly maxExposedTools: number,
+    private readonly authorize: ActionAuthorizer,
+    private readonly hasExplicitAuthorizer: boolean
   ) {}
 
   static async create(
     providers: ToolProvider[],
-    options: { maxExposedTools?: number } = {}
+    options: ActionRuntimeOptions = {}
   ): Promise<ActionRuntime> {
     const runtime = new ActionRuntime(
       providers,
-      options.maxExposedTools ?? 20
+      options.maxExposedTools ?? 20,
+      options.authorize ??
+        ((request) => defaultAuthorize(request.definition)),
+      options.authorize !== undefined
     );
     await runtime.loadRoutes();
     return runtime;
   }
 
   listTools(): ToolDefinition[] {
-    return [...this.routes.values()].map(({ definition }) => definition);
+    return [...this.routes.values()]
+      .map(({ definition }) => definition)
+      .filter(
+        (definition) =>
+          definition.effect !== "sensitive" ||
+          this.hasExplicitAuthorizer
+      );
   }
 
   async execute(call: ToolCall): Promise<ToolResult> {
@@ -56,6 +95,8 @@ export class ActionRuntime {
       };
     }
 
+    // Register cancellation before authorization. A session may cancel a call
+    // while an asynchronous approval backend is still deciding.
     const controller = new AbortController();
     if (call.callId) {
       this.active.get(call.callId)?.abort();
@@ -63,17 +104,56 @@ export class ActionRuntime {
     }
 
     try {
-      return await route.provider.callTool(call, controller.signal);
-    } catch (error) {
-      return {
-        name: call.name,
-        ok: false,
-        ...(call.callId ? { callId: call.callId } : {}),
-        error:
-          error instanceof Error
-            ? error.message
-            : "Tool execution failed"
-      };
+      let authorization: ActionAuthorizationDecision;
+      try {
+        const decision = this.authorize({
+          call,
+          definition: route.definition,
+          providerId: route.provider.id
+        });
+        authorization = isPromiseLike(decision)
+          ? await decision
+          : decision;
+      } catch {
+        return {
+          name: call.name,
+          ok: false,
+          ...(call.callId ? { callId: call.callId } : {}),
+          error: "Action authorization failed"
+        };
+      }
+
+      if (controller.signal.aborted) {
+        return {
+          name: call.name,
+          ok: false,
+          ...(call.callId ? { callId: call.callId } : {}),
+          error: "Action cancelled"
+        };
+      }
+
+      if (!authorization.allowed) {
+        return {
+          name: call.name,
+          ok: false,
+          ...(call.callId ? { callId: call.callId } : {}),
+          error: authorization.reason
+        };
+      }
+
+      try {
+        return await route.provider.callTool(call, controller.signal);
+      } catch (error) {
+        return {
+          name: call.name,
+          ok: false,
+          ...(call.callId ? { callId: call.callId } : {}),
+          error:
+            error instanceof Error
+              ? error.message
+              : "Tool execution failed"
+        };
+      }
     } finally {
       if (call.callId && this.active.get(call.callId) === controller) {
         this.active.delete(call.callId);
@@ -121,9 +201,10 @@ export class ActionRuntime {
       }
     }
 
-    if (this.routes.size > this.maxExposedTools) {
+    const exposedCount = this.listTools().length;
+    if (exposedCount > this.maxExposedTools) {
       throw new Error(
-        `Action runtime exposes ${this.routes.size} tools, above the configured limit of ${this.maxExposedTools}`
+        `Action runtime exposes ${exposedCount} tools, above the configured limit of ${this.maxExposedTools}`
       );
     }
   }

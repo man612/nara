@@ -25,6 +25,22 @@ export type ToolResult = {
   scheduling?: ToolResultScheduling;
 };
 
+export type ActionAuthorizationRequest = {
+  call: ToolCall;
+  definition: ToolDefinition;
+  providerId: string;
+};
+
+export type ActionAuthorizationDecision =
+  | { allowed: true }
+  | { allowed: false; reason: string };
+
+export type ActionAuthorizer = (
+  request: ActionAuthorizationRequest
+) =>
+  | ActionAuthorizationDecision
+  | Promise<ActionAuthorizationDecision>;
+
 export interface ToolProvider {
   readonly id: string;
   listTools(): Promise<ToolDefinition[]>;

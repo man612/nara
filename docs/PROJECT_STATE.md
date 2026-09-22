@@ -25,7 +25,8 @@ Real names, private biography, relationship details, credentials, recordings and
 - ordered connect-time voice fallback;
 - bounded playback pacing, interruption and barge-in lifecycle;
 - provider usage/token accounting including cached versus uncached input where available;
-- provider-neutral Action Runtime with cancellation and compact tool schemas;
+- provider-neutral Action Runtime with cancellation, compact tool schemas and fail-closed sensitive-action authorization;
+- sensitive tools stay hidden/denied unless a session installs an explicit authorizer; firmware/phone bridges expose session-aware policy hooks;
 - firmware MCP compatibility adapter isolated behind compact Nara aliases;
 - privacy-filtered `personal_memory_search` available to realtime voice;
 - Spotify Web API search/playback/queue/transport control behind media tools;

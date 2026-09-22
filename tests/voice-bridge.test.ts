@@ -514,6 +514,129 @@ describe("FirmwareVoiceBridge", () => {
     await handler.close();
   });
 
+  it("hides sensitive session tools until an explicit session authorizer is installed", async () => {
+    const sensitiveProvider = (calls: unknown[]) => ({
+      id: "external",
+      async listTools() {
+        return [
+          {
+            name: "external_sensitive",
+            description: "Perform a sensitive external action.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                target: { type: "string" }
+              },
+              required: ["target"],
+              additionalProperties: false
+            },
+            effect: "sensitive" as const
+          }
+        ];
+      },
+      async callTool(call: {
+        name: string;
+        arguments: unknown;
+        callId?: string;
+      }) {
+        calls.push(call);
+        return {
+          name: call.name,
+          ok: true,
+          ...(call.callId ? { callId: call.callId } : {}),
+          value: { done: true }
+        };
+      }
+    });
+
+    {
+      const codecFactory = new FakeCodecFactory();
+      const voiceProvider = new FakeVoiceProvider();
+      const { transport } = createTransport();
+      const calls: unknown[] = [];
+      const bridge = new FirmwareVoiceBridge({
+        codecFactory,
+        voiceProvider,
+        createToolProviders: () => [sensitiveProvider(calls)]
+      });
+      const handler = await bridge.createSession(
+        createFirmwareSession(),
+        transport
+      );
+
+      expect(voiceProvider.connectOptions?.tools).toEqual([]);
+      expect(calls).toEqual([]);
+      await handler.close();
+    }
+
+    {
+      const codecFactory = new FakeCodecFactory();
+      const voiceProvider = new FakeVoiceProvider();
+      const { transport } = createTransport();
+      const calls: unknown[] = [];
+      const authorizations: unknown[] = [];
+      const bridge = new FirmwareVoiceBridge({
+        codecFactory,
+        voiceProvider,
+        createToolProviders: () => [sensitiveProvider(calls)],
+        authorizeTool: (session, request) => {
+          authorizations.push({
+            sessionId: session.sessionId,
+            providerId: request.providerId,
+            name: request.call.name,
+            effect: request.definition.effect
+          });
+          return { allowed: true };
+        }
+      });
+      const handler = await bridge.createSession(
+        createFirmwareSession(),
+        transport
+      );
+
+      expect(voiceProvider.connectOptions?.tools).toEqual([
+        expect.objectContaining({
+          name: "external_sensitive",
+          effect: "sensitive"
+        })
+      ]);
+
+      await voiceProvider.session.emit({
+        type: "tool.call",
+        name: "external_sensitive",
+        arguments: { target: "item-1" },
+        callId: "sensitive-1"
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(authorizations).toEqual([
+        {
+          sessionId: "session-1",
+          providerId: "external",
+          name: "external_sensitive",
+          effect: "sensitive"
+        }
+      ]);
+      expect(calls).toEqual([
+        {
+          name: "external_sensitive",
+          arguments: { target: "item-1" },
+          callId: "sensitive-1"
+        }
+      ]);
+      expect(voiceProvider.session.toolResults).toEqual([
+        {
+          name: "external_sensitive",
+          ok: true,
+          callId: "sensitive-1",
+          value: { done: true }
+        }
+      ]);
+
+      await handler.close();
+    }
+  });
+
   it("closes both codec and provider session exactly at the firmware boundary", async () => {
     const codecFactory = new FakeCodecFactory();
     const voiceProvider = new FakeVoiceProvider();

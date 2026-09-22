@@ -1,5 +1,9 @@
 import { ActionRuntime } from "../actions/runtime.js";
-import type { ToolProvider } from "../actions/contracts.js";
+import type {
+  ActionAuthorizationDecision,
+  ActionAuthorizationRequest,
+  ToolProvider
+} from "../actions/contracts.js";
 import type {
   AudioChunk,
   ProviderUsage,
@@ -18,6 +22,12 @@ export type PhoneVoiceBridgeOptions = {
   createToolProviders?: (
     context: PhoneSessionContext
   ) => ToolProvider[] | Promise<ToolProvider[]>;
+  authorizeTool?: (
+    context: PhoneSessionContext,
+    request: ActionAuthorizationRequest
+  ) =>
+    | ActionAuthorizationDecision
+    | Promise<ActionAuthorizationDecision>;
   onUsage?: (usage: ProviderUsage) => void | Promise<void>;
   onError?: (error: Error) => void | Promise<void>;
 };
@@ -188,7 +198,16 @@ export class PhoneVoiceBridge {
       ? await this.options.createToolProviders(context)
       : [];
     const actions =
-      providers.length > 0 ? await ActionRuntime.create(providers) : null;
+      providers.length > 0
+        ? await ActionRuntime.create(providers, {
+            ...(this.options.authorizeTool
+              ? {
+                  authorize: (request) =>
+                    this.options.authorizeTool!(context, request)
+                }
+              : {})
+          })
+        : null;
 
     try {
       const voice = await this.options.voiceProvider.connect(

@@ -23,7 +23,19 @@ voice / brain provider
 voice / brain provider
 ```
 
-The runtime owns routing, duplicate-name rejection, a limit on the exposed tool catalog, per-call cancellation, and provider lifecycle.
+The runtime owns routing, duplicate-name rejection, a limit on the exposed tool catalog, per-call cancellation, fail-closed action authorization, and provider lifecycle.
+
+## Action authorization policy
+
+Tool effects are an enforcement input, not decorative metadata.
+
+- `read` and ordinary bounded `write` tools are allowed by the default runtime policy;
+- `sensitive` tools are hidden from the model and denied at execution time unless the session installs an explicit authorizer;
+- policy backend errors fail closed before the provider is called;
+- an explicit authorizer receives the tool call, immutable definition and provider ID;
+- firmware and phone voice bridges can bind that authorizer to their authenticated session context without letting the model choose the viewer identity.
+
+This is the foundation for future passkey/phone approval UX around external destructive actions. It does not turn speaker recognition into authorization. High-risk firmware MCP operations remain absent from the model-facing catalog entirely.
 
 ## Device MCP compatibility
 
