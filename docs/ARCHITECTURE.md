@@ -21,6 +21,6 @@ The protocol exposes semantic events such as `touch`, `imu`, `face.set`, `audio.
 
 ## Action boundary
 
-Voice and brain adapters never execute physical or external tools directly. They emit provider-neutral tool calls into the ActionRuntime. Device MCP is one adapter behind that boundary; future search, memory, Hermes and modern external MCP providers can join the same runtime without leaking their wire protocols into the voice path.
+Voice and brain adapters never execute physical or external tools directly. They emit provider-neutral tool calls into the ActionRuntime. Device MCP, personal memory and optional Hermes delegation are current adapters behind that boundary; dedicated search and modern external MCP providers can join later without leaking their wire protocols into the voice path.
 
 Speech interruption and tool-task cancellation are separate lifecycles.
