@@ -1,7 +1,8 @@
 voice:
   primary: gemini-live
-  # Add fallback IDs only for voice adapters that are actually implemented.
-  # GPT-Live and chained STT -> brain -> TTS remain roadmap adapters.
+  # The chained adapter is implemented but opt-in because deployments must
+  # choose their own STT/TTS endpoints. Add "chained" here after configuring
+  # the speech providers below. GPT-Live remains roadmap work.
   fallbacks: []
 
 brain:
@@ -28,6 +29,34 @@ providers:
     # Transcription creates extra provider output/usage. Keep it opt-in.
     input_transcription: false
     output_transcription: false
+
+  # Optional cost/self-host friendly voice path. It reuses the brain route
+  # above and preserves Nara Action Runtime tool calls.
+  chained:
+    kind: voice
+    adapter: chained
+    stt_provider: speech-stt
+    tts_provider: speech-tts
+    system_instruction: ${NARA_CHAINED_SYSTEM_INSTRUCTION:-Be concise and natural.}
+
+  # Any server exposing the OpenAI-compatible audio endpoints can sit here.
+  # Omit api_key_env for an unauthenticated localhost gateway.
+  speech-stt:
+    kind: stt
+    adapter: openai-compatible
+    base_url: ${NARA_STT_BASE_URL:-http://127.0.0.1:8001/v1}
+    model: ${NARA_STT_MODEL:-whisper-1}
+    language: ${NARA_STT_LANGUAGE:-id}
+    timeout_ms: 30000
+
+  speech-tts:
+    kind: tts
+    adapter: openai-compatible
+    base_url: ${NARA_TTS_BASE_URL:-http://127.0.0.1:8002/v1}
+    model: ${NARA_TTS_MODEL:-tts-1}
+    voice: ${NARA_TTS_VOICE:-alloy}
+    sample_rate: 24000
+    timeout_ms: 30000
 
   searxng:
     kind: search
