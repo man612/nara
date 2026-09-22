@@ -18,6 +18,14 @@ const DEFAULT_ENDPOINT =
   "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
 const SETUP_TIMEOUT_MS = 15000;
 const WS_OPEN = 1;
+const MAX_RECONNECT_OUTBOX_BYTES = 128 * 1024;
+const MAX_RECONNECT_OUTBOX_MESSAGES = 256;
+
+type OutboxEntry = {
+  serialized: string;
+  bytes: number;
+  audio: boolean;
+};
 
 type GeminiSocket = {
   readonly readyState: number;
@@ -165,7 +173,8 @@ class GeminiLiveVoiceSession implements VoiceSession {
   private closed = false;
   private outputActive = false;
   private serverEventChain: Promise<void> = Promise.resolve();
-  private readonly outbox: string[] = [];
+  private readonly outbox: OutboxEntry[] = [];
+  private outboxBytes = 0;
 
   private constructor(
     options: GeminiLiveOptions,
@@ -213,14 +222,17 @@ class GeminiLiveVoiceSession implements VoiceSession {
       chunk.data.byteLength
     ).toString("base64");
 
-    this.sendJson({
-      realtimeInput: {
-        audio: {
-          data,
-          mimeType: "audio/pcm;rate=16000"
+    this.sendJson(
+      {
+        realtimeInput: {
+          audio: {
+            data,
+            mimeType: "audio/pcm;rate=16000"
+          }
         }
-      }
-    });
+      },
+      true
+    );
   }
 
   async sendText(text: string): Promise<void> {
@@ -279,6 +291,7 @@ class GeminiLiveVoiceSession implements VoiceSession {
     this.closed = true;
     this.reconnectRequested = false;
     this.outbox.length = 0;
+    this.outboxBytes = 0;
 
     const sockets = [this.socket, this.pendingSocket].filter(
       (socket): socket is GeminiSocket => socket !== null
@@ -569,7 +582,7 @@ class GeminiLiveVoiceSession implements VoiceSession {
     return this.reconnecting;
   }
 
-  private sendJson(payload: unknown): void {
+  private sendJson(payload: unknown, audio = false): void {
     const serialized = JSON.stringify(payload);
     const socket = this.socket;
     if (socket && socket.readyState === WS_OPEN) {
@@ -577,7 +590,31 @@ class GeminiLiveVoiceSession implements VoiceSession {
       return;
     }
 
-    this.outbox.push(serialized);
+    const entry: OutboxEntry = {
+      serialized,
+      bytes: Buffer.byteLength(serialized),
+      audio
+    };
+    if (!this.makeOutboxRoom(entry)) {
+      if (audio) return;
+      throw new Error("Gemini Live reconnect queue is full");
+    }
+
+    this.outbox.push(entry);
+    this.outboxBytes += entry.bytes;
+  }
+
+  private makeOutboxRoom(entry: OutboxEntry): boolean {
+    while (
+      this.outboxBytes + entry.bytes > MAX_RECONNECT_OUTBOX_BYTES ||
+      this.outbox.length >= MAX_RECONNECT_OUTBOX_MESSAGES
+    ) {
+      const audioIndex = this.outbox.findIndex((candidate) => candidate.audio);
+      if (audioIndex < 0) return false;
+      const [dropped] = this.outbox.splice(audioIndex, 1);
+      if (dropped) this.outboxBytes -= dropped.bytes;
+    }
+    return true;
   }
 
   private flushOutbox(): void {
@@ -586,7 +623,9 @@ class GeminiLiveVoiceSession implements VoiceSession {
 
     while (this.outbox.length > 0) {
       const message = this.outbox.shift();
-      if (message !== undefined) socket.send(message);
+      if (!message) continue;
+      this.outboxBytes -= message.bytes;
+      socket.send(message.serialized);
     }
   }
 

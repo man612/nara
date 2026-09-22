@@ -12,7 +12,8 @@ const providerSchema = z.object({
   adapter: z.string(),
   model: z.string().optional(),
   base_url: z.string().optional(),
-  api_key_env: z.string().optional()
+  api_key_env: z.string().optional(),
+  timeout_ms: z.number().int().min(250).max(120_000).optional()
 }).passthrough();
 
 const configSchema = z.object({

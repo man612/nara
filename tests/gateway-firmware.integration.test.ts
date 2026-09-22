@@ -113,6 +113,32 @@ describe("firmware WebSocket edge", () => {
     }
   });
 
+  it("rejects WebSocket messages above the configured protocol limit", async () => {
+    const gateway = createGatewayServer({
+      maxWebSocketPayloadBytes: 1024,
+      heartbeatIntervalMs: 0
+    });
+
+    await new Promise<void>((resolve) =>
+      gateway.server.listen(0, "127.0.0.1", resolve)
+    );
+    const address = gateway.server.address() as AddressInfo;
+    const socket = new WebSocket(`ws://127.0.0.1:${address.port}/device`);
+
+    try {
+      await once(socket, "open");
+      socket.send("x".repeat(2048));
+
+      const [code] = (await once(socket, "close")) as [number, Buffer];
+      expect(code).toBe(1009);
+    } finally {
+      await new Promise<void>((resolve) => gateway.wss.close(() => resolve()));
+      await new Promise<void>((resolve, reject) =>
+        gateway.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
   it("rejects binary audio before the firmware hello", async () => {
     const gateway = createGatewayServer();
 

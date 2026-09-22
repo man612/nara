@@ -10,7 +10,11 @@ export type OpenAICompatibleConfig = {
   baseUrl: string;
   apiKey?: string;
   model: string;
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
 };
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 type UsageLike = {
   prompt_tokens?: number;
@@ -70,18 +74,26 @@ export class OpenAICompatibleBrain implements BrainProvider {
 
   async complete(request: BrainRequest): Promise<BrainResponse> {
     const baseUrl = this.config.baseUrl.replace(/\/$/, "");
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(this.config.apiKey ? { authorization: `Bearer ${this.config.apiKey}` } : {})
-      },
-      body: JSON.stringify({
-        model: this.config.model,
-        messages: request.messages,
-        ...(request.tools ? { tools: request.tools } : {})
-      })
-    });
+    const response = await (this.config.fetchImpl ?? fetch)(
+      `${baseUrl}/chat/completions`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(this.config.apiKey
+            ? { authorization: `Bearer ${this.config.apiKey}` }
+            : {})
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: request.messages,
+          ...(request.tools ? { tools: request.tools } : {})
+        }),
+        signal: AbortSignal.timeout(
+          this.config.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+        )
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`${this.id} failed: ${response.status} ${await response.text()}`);
