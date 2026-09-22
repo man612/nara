@@ -99,6 +99,50 @@ describe("voice provider registry", () => {
     expect(createVoiceChain(config).id).toBe("voice-fallback");
   });
 
+  it("constructs the chained STT -> brain -> TTS route", () => {
+    const config = {
+      voice: {
+        primary: "chained",
+        fallbacks: []
+      },
+      brain: {
+        primary: "brain",
+        fallbacks: []
+      },
+      providers: {
+        chained: {
+          kind: "voice",
+          adapter: "chained",
+          stt_provider: "stt",
+          tts_provider: "tts",
+          system_instruction: "Be concise."
+        },
+        stt: {
+          kind: "stt",
+          adapter: "openai-compatible",
+          base_url: "http://localhost:8001/v1",
+          model: "whisper"
+        },
+        tts: {
+          kind: "tts",
+          adapter: "openai-compatible",
+          base_url: "http://localhost:8002/v1",
+          model: "tts",
+          voice: "local",
+          sample_rate: 24000
+        },
+        brain: {
+          kind: "brain",
+          adapter: "openai-compatible",
+          base_url: "http://localhost:8003/v1",
+          model: "brain"
+        }
+      }
+    } satisfies ProvidersConfig;
+
+    expect(createVoiceChain(config).id).toBe("chained");
+  });
+
   it("rejects duplicate voice provider IDs in one route", () => {
     process.env.NARA_TEST_GEMINI_KEY = "test-secret";
 
