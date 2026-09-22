@@ -29,7 +29,12 @@ class FakeBrain implements BrainProvider {
   readonly requests: BrainRequest[] = [];
 
   async complete(request: BrainRequest): Promise<BrainResponse> {
-    this.requests.push(structuredClone(request));
+    this.requests.push({
+      messages: structuredClone(request.messages),
+      ...(request.tools
+        ? { tools: structuredClone(request.tools) }
+        : {})
+    });
 
     if (this.requests.length === 1) {
       return {
