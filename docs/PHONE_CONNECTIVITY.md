@@ -1,6 +1,6 @@
 # Phone connectivity and commissioning
 
-Status: accepted product direction; connectivity and useful no-network foundations implemented, direct peer/provisioning hardening remains staged.
+Status: connectivity, useful no-network behavior and the first DPP QR commissioning path are implemented; secure universal fallback/direct-peer hardening and hardware validation remain staged.
 
 Last reviewed: 2026-09-21
 
@@ -10,6 +10,8 @@ Last reviewed: 2026-09-21
 Implemented now:
 
 - phone hotspot works as ordinary saved Wi-Fi station connectivity;
+- Waveshare 1.85B firmware can start ESP-IDF Wi-Fi Easy Connect / DPP commissioning, display its bootstrap QR, receive Wi-Fi credentials through DPP events and store them in the existing saved-network store;
+- BOOT hold opens/retries DPP while an explicit BOOT click can switch to the inherited fallback path on phones without DPP support;
 - configured firmware stays out of an endless provisioning loop when saved Wi-Fi is temporarily absent;
 - saved-network retry/recovery is automatic;
 - isolated firmware now has RTC-backed clock/timer/alarm primitives and local touch shortcuts;
@@ -402,12 +404,21 @@ Still staged:
 
 ### C4 — production provisioning
 
-- evaluate/migrate to ESP-IDF Unified/Network Provisioning;
-- Security 2;
+Implemented software foundation:
+
+- DPP / Wi-Fi Easy Connect enrollee flow on Waveshare 1.85B;
+- on-device DPP QR display;
+- received credentials persisted through Nara's saved-network store;
+- explicit physical DPP retry and user-selected fallback path.
+
+Still required before production commissioning is complete:
+
+- real-phone/router compatibility, RF and power validation;
+- migrate the universal BLE/SoftAP fallback to ESP-IDF Unified/Network Provisioning;
+- Security 2 for that fallback;
 - per-device proof of possession;
-- QR metadata;
-- provisioning window lifecycle;
-- DPP fast path on supported Android devices.
+- provisioning-window timeout/lifecycle hardening;
+- polished QR/fallback onboarding UX.
 
 ### C5 — optional native companion
 
