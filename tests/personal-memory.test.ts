@@ -7,17 +7,35 @@ import {
   canViewerAccessFact,
   type PersonalMemoryFact
 } from "../src/memory/personal.js";
+import type { PrivateDataKeyring } from "../src/security/private-data.js";
 
 const createdDirectories: string[] = [];
 
-async function createStore() {
+async function createStore(options: {
+  encryption?: PrivateDataKeyring;
+} = {}) {
   const directory = await mkdtemp(join(tmpdir(), "nara-memory-"));
   createdDirectories.push(directory);
   const path = join(directory, "personal-memory.json");
 
   return {
     path,
-    store: new FilePersonalMemoryStore(path)
+    store: new FilePersonalMemoryStore(path, options)
+  };
+}
+
+function keyring(
+  activeKeyId: string,
+  entries: Array<[string, number]>
+): PrivateDataKeyring {
+  return {
+    activeKeyId,
+    keys: new Map(
+      entries.map(([id, byte]) => [
+        id,
+        Uint8Array.from({ length: 32 }, () => byte)
+      ])
+    )
   };
 }
 
@@ -154,6 +172,88 @@ describe("file personal memory store", () => {
     };
     expect(file.version).toBe(1);
     expect(file.facts).toHaveLength(1);
+  });
+
+  it("encrypts personal memory at rest and reloads it with the keyring", async () => {
+    const encryption = keyring("key-2026-09", [
+      ["key-2026-09", 7]
+    ]);
+    const { path, store } = await createStore({ encryption });
+
+    await store.upsert(
+      fact("encrypted", {
+        text: "A private value that must not be readable on disk."
+      })
+    );
+
+    const raw = await readFile(path, "utf8");
+    expect(raw).not.toContain("private value");
+    const envelope = JSON.parse(raw) as {
+      encryption?: {
+        algorithm?: string;
+        keyId?: string;
+        iv?: string;
+        tag?: string;
+      };
+      ciphertext?: string;
+    };
+    expect(envelope.encryption).toMatchObject({
+      algorithm: "A256GCM",
+      keyId: "key-2026-09",
+      iv: expect.any(String),
+      tag: expect.any(String)
+    });
+    expect(envelope.ciphertext).toEqual(expect.any(String));
+
+    const reloaded = new FilePersonalMemoryStore(path, {
+      encryption
+    });
+    await expect(
+      reloaded.get("encrypted")
+    ).resolves.toMatchObject({
+      id: "encrypted",
+      text: "A private value that must not be readable on disk."
+    });
+  });
+
+  it("migrates legacy plaintext and rotates to the active key on read", async () => {
+    const { path, store } = await createStore();
+    await store.upsert(
+      fact("migrate", {
+        text: "Legacy plaintext should disappear after migration."
+      })
+    );
+    expect(await readFile(path, "utf8")).toContain(
+      "Legacy plaintext"
+    );
+
+    const oldRing = keyring("old", [["old", 3]]);
+    const migrating = new FilePersonalMemoryStore(path, {
+      encryption: oldRing
+    });
+    await migrating.get("migrate");
+
+    let envelope = JSON.parse(
+      await readFile(path, "utf8")
+    ) as { encryption: { keyId: string } };
+    expect(envelope.encryption.keyId).toBe("old");
+    expect(await readFile(path, "utf8")).not.toContain(
+      "Legacy plaintext"
+    );
+
+    const rotatedRing = keyring("new", [
+      ["old", 3],
+      ["new", 9]
+    ]);
+    const rotated = new FilePersonalMemoryStore(path, {
+      encryption: rotatedRing
+    });
+    await rotated.get("migrate");
+
+    envelope = JSON.parse(
+      await readFile(path, "utf8")
+    ) as { encryption: { keyId: string } };
+    expect(envelope.encryption.keyId).toBe("new");
   });
 
   it("supports edits and deletion by stable fact id", async () => {

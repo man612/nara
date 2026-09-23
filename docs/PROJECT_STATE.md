@@ -38,7 +38,7 @@ Real names, private biography, relationship details, credentials, recordings and
 - persistent device claim/credential lifecycle with hashed secrets, rotation and revocation;
 - provider-neutral person directory and conservative speaker-identity decision service;
 - runtime speaker recognition integration that remains personalization evidence rather than private-memory authorization;
-- file-backed personal memory with validation, subject/viewer access policy, sharing, expiry, bounded recall, edit/delete and fail-closed persistence;
+- file-backed personal memory with validation, subject/viewer access policy, sharing, expiry, bounded recall, edit/delete, fail-closed persistence and optional AES-256-GCM keyring encryption at rest;
 - content/context filtering tests proving unauthorized personal facts do not reach the model;
 - privacy-filtered offline personal-capsule compiler/export with recipient/viewer enforcement;
 - deterministic Open-Meteo weather summaries and scheduled daily briefings;
@@ -318,8 +318,8 @@ For optional person-tracking gaze, the base Waveshare board has no camera. An ex
 Still intentionally open:
 
 - visual/account-transfer polish around the implemented strong passkey lifecycle;
-- encryption-at-rest/key ownership for private memory;
-- encryption/authenticity policy for private capsule/assets at rest and on removable media;
+- private removable-media content is intentionally forbidden in the first production profile; add a per-device removable-media key lifecycle before changing that policy;
+- independently updated asset-pack publisher authenticity/signature remains a separate firmware hardening item;
 - exact local-network Indonesian STT/TTS/LLM stack;
 - final physical gesture thresholds;
 - whether two physical speech microphones plus playback reference should be exposed to the AFE after real capture analysis;

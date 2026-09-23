@@ -531,3 +531,30 @@ References:
 - https://www.w3.org/TR/webauthn-3/
 - https://fidoalliance.org/passkeys/
 - https://fidoalliance.org/enterprise-deployment-considerations-for-fido-passkeys/
+
+## Personal-memory encryption at rest
+
+Purpose: protect file-backed personal knowledge against disk/snapshot theft
+without mixing encryption keys into the memory file.
+
+Useful findings:
+
+- AES-GCM provides authenticated encryption: confidentiality for plaintext and
+  integrity/authentication for protected data and AAD;
+- NIST recommends 96-bit GCM IVs for interoperability, efficiency and simpler
+  uniqueness handling;
+- Node's authenticated cipher APIs support AES-GCM authentication tags and
+  authenticated additional data.
+
+Decision:
+
+Nara uses AES-256-GCM with a fresh random 96-bit IV and 128-bit tag per write.
+The deployment owns a versioned external keyring; file envelopes carry only a
+key ID. Production file-backed personal memory requires the keyring. Old keys
+may remain read-only during rotation while data is rewritten under the active
+key.
+
+References:
+
+- https://csrc.nist.gov/pubs/sp/800/38/d/final
+- https://nodejs.org/api/crypto.html
