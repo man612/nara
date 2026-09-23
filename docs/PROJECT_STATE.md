@@ -4,7 +4,7 @@ This file is Nara's durable project checkpoint for humans and coding agents.
 
 Read it after `docs/REPO_MAP.md`. Update it after every meaningful implementation batch. Do not rely on chat history as the only source of truth.
 
-Last reviewed: 2026-09-22
+Last reviewed: 2026-09-23
 
 ## Product direction
 
@@ -52,7 +52,8 @@ Real names, private biography, relationship details, credentials, recordings and
 - bounded authenticated network-diagnostic endpoints shared with firmware;
 - WebAuthn/passkey registration and authentication with server-bound challenges, RP/origin checks and real signature verification;
 - short-lived authenticated human viewer sessions plus expiring per-device trusted viewer grants;
-- dynamic private-memory viewer resolution on every memory tool call, so expired/revoked physical-device grants fail back to guest.
+- dynamic private-memory viewer resolution on every memory tool call, so expired/revoked physical-device grants fail back to guest;
+- CI/API operational hardening: feature branches use pull-request CI only, merged `main` keeps push CI, and repository instructions require batched GitHub writes plus non-polling CI checks.
 
 ### Firmware / Waveshare 1.85B
 

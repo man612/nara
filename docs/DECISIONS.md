@@ -195,3 +195,28 @@ Consequences:
   sensitive action;
 - dangerous firmware operations remain unexposed rather than relying only on
   this policy layer.
+
+
+## 2026-09-23 — CI and GitHub API work is batched
+
+**Status:** accepted
+
+Nara previously ran the same feature-branch change through both `push` and
+`pull_request` CI, while API-driven editing could create many tiny commits
+and repeatedly poll Actions. This produced duplicate/cancelled workflow runs
+and unnecessary GitHub API pressure.
+
+Decision:
+
+- `push` CI runs only on `main`;
+- feature branches are validated through `pull_request` CI;
+- multi-file API edits should be batched into one coherent Git commit when
+  practical;
+- Actions status is checked after the batch is stable rather than continuously
+  polled;
+- job/step logs are fetched only when needed to diagnose a failure;
+- rate-limit responses are treated as a signal to stop/reduce requests, not to
+  retry rapidly.
+
+This is an operational reliability rule, not a relaxation of testing. Every PR
+still receives CI, and merged `main` receives a post-merge CI run.
