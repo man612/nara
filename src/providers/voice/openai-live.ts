@@ -66,6 +66,7 @@ type OpenAILiveMessage = {
   event?: unknown;
   session?: unknown;
   usage?: unknown;
+  reason?: unknown;
 };
 
 function defaultSocketFactory(
@@ -182,6 +183,7 @@ export class OpenAILiveVoiceProvider implements VoiceProvider {
     options: VoiceConnectOptions = {}
   ): Promise<VoiceSession> {
     return OpenAILiveVoiceSession.connect(
+      this.id,
       this.options,
       options.tools ?? []
     );
@@ -208,8 +210,10 @@ class OpenAILiveVoiceSession implements VoiceSession {
   private lastVoiceSeconds: number | null = null;
   private serverEventChain: Promise<void> = Promise.resolve();
   private closeResolver: (() => void) | null = null;
+  private terminalNotified = false;
 
   private constructor(
+    private readonly providerId: string,
     private readonly options: OpenAILiveOptions,
     tools: ToolDefinition[]
   ) {
@@ -223,10 +227,15 @@ class OpenAILiveVoiceSession implements VoiceSession {
   }
 
   static async connect(
+    providerId: string,
     options: OpenAILiveOptions,
     tools: ToolDefinition[]
   ): Promise<OpenAILiveVoiceSession> {
-    const session = new OpenAILiveVoiceSession(options, tools);
+    const session = new OpenAILiveVoiceSession(
+      providerId,
+      options,
+      tools
+    );
     await session.open();
     return session;
   }
@@ -461,11 +470,20 @@ class OpenAILiveVoiceSession implements VoiceSession {
           );
           return;
         }
-        if (!this.closing && !this.closed) {
+
+        this.started = false;
+        if (
+          !this.closing &&
+          !this.closed &&
+          !this.terminalNotified
+        ) {
+          this.terminalNotified = true;
           void this.emit({
-            type: "error",
-            message:
-              `OpenAI Live connection closed (${code}): ${reason.toString()}`
+            type: "session.disconnected",
+            providerId: this.providerId,
+            reason:
+              `OpenAI Live transport closed (${code}): ${reason.toString()}`,
+            recoverable: true
           });
         }
       });
@@ -590,6 +608,27 @@ class OpenAILiveVoiceSession implements VoiceSession {
       await this.finishOutput();
       await this.finalizeInputTranscript();
       this.closeResolver?.();
+
+      const reason =
+        typeof message.reason === "string"
+          ? message.reason
+          : "unknown";
+      if (
+        !this.closing &&
+        !this.closed &&
+        reason !== "close_requested"
+      ) {
+        this.terminalNotified = true;
+        this.started = false;
+        await this.emit({
+          type: "session.disconnected",
+          providerId: this.providerId,
+          reason: `OpenAI Live session closed: ${reason}`,
+          recoverable:
+            reason === "connection_lost" ||
+            reason === "expired"
+        });
+      }
       return;
     }
 

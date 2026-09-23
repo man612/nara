@@ -243,3 +243,26 @@ Consequences:
 - Gemini Live and chained voice remain available behind the same
   `VoiceProvider` contract, so GPT-Live is optional rather than a new core
   dependency.
+
+## 2026-09-23 — Voice failover occurs only at a clean user-input boundary
+
+**Status:** accepted
+
+A physical/phone Nara session may survive a realtime voice-provider transport
+failure, but provider context is not blindly migrated.
+
+Consequences:
+
+- provider-native recovery/resumption gets first chance;
+- terminal provider loss cancels identified pending Action Runtime calls and
+  interrupts stale playback;
+- late events from the dead session are ignored by generation;
+- Nara never replays a possibly-partially-delivered audio/text operation;
+- cross-provider recovery starts only when the user supplies the next input;
+- the next configured provider is preferred, with wraparound to the previous
+  provider last;
+- a single-provider route reconnects the same provider;
+- non-recoverable terminal reasons fail closed instead of bypassing policy or
+  safety by silently switching vendors;
+- conversation context remains provider-owned unless an adapter has a
+  documented safe resumption mechanism.

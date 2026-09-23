@@ -471,3 +471,37 @@ References:
 - https://developers.openai.com/api/docs/guides/live-prompting
 - https://developers.openai.com/api/docs/guides/voice-latency-cost
 - https://developers.openai.com/api/docs/models/gpt-live-1
+
+## Realtime voice recovery and provider failover
+
+Purpose: keep the physical/phone Nara session usable across provider transport
+failures without duplicating user input, actions or side effects.
+
+Useful findings:
+
+- Gemini Live documents session resumption tokens and GoAway handling so a
+  provider adapter can reconnect while preserving provider context;
+- GPT-Live documents terminal session reasons separately from ordinary command
+  errors and says failed connections should restore task state before routing
+  results to a replacement session;
+- GPT-Live also warns that late results from an old session must not overwrite
+  newer work and that unfinished backend actions must be checked before
+  continuing;
+- when no stored GPT-Live recording/fork is available, replacement sessions
+  must be supplied relevant saved text history explicitly rather than assuming
+  transport reconnection preserves context.
+
+Decision:
+
+Nara allows provider-native resumption first. Cross-provider failover is a
+fresh provider conversation at the next user-input boundary, never an
+automatic replay of the failed turn. Identified pending tool work is cancelled,
+late provider events are generation-isolated, and non-recoverable terminal
+reasons fail closed.
+
+References:
+
+- https://ai.google.dev/gemini-api/docs/live-api/session-management
+- https://ai.google.dev/gemini-api/docs/live-api/best-practices
+- https://developers.openai.com/api/docs/guides/live-conversations
+- https://developers.openai.com/api/docs/guides/voice-websockets

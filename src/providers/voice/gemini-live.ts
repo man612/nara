@@ -156,7 +156,11 @@ export class GeminiLiveVoiceProvider implements VoiceProvider {
   }
 
   async connect(options: VoiceConnectOptions = {}): Promise<VoiceSession> {
-    return GeminiLiveVoiceSession.connect(this.options, options.tools ?? []);
+    return GeminiLiveVoiceSession.connect(
+      this.id,
+      this.options,
+      options.tools ?? []
+    );
   }
 }
 
@@ -177,6 +181,7 @@ class GeminiLiveVoiceSession implements VoiceSession {
   private outboxBytes = 0;
 
   private constructor(
+    private readonly providerId: string,
     options: GeminiLiveOptions,
     tools: ToolDefinition[]
   ) {
@@ -186,10 +191,15 @@ class GeminiLiveVoiceSession implements VoiceSession {
   }
 
   static async connect(
+    providerId: string,
     options: GeminiLiveOptions,
     tools: ToolDefinition[]
   ): Promise<GeminiLiveVoiceSession> {
-    const session = new GeminiLiveVoiceSession(options, tools);
+    const session = new GeminiLiveVoiceSession(
+      providerId,
+      options,
+      tools
+    );
     await session.openSocket(null, true);
     return session;
   }
@@ -568,12 +578,19 @@ class GeminiLiveVoiceSession implements VoiceSession {
         await this.openSocket(this.resumptionHandle, false);
         this.reconnectRequested = false;
       } catch (error) {
+        const message =
+          error instanceof Error
+            ? `Gemini reconnect failed: ${error.message}`
+            : "Gemini reconnect failed";
         await this.emit({
           type: "error",
-          message:
-            error instanceof Error
-              ? `Gemini reconnect failed: ${error.message}`
-              : "Gemini reconnect failed"
+          message
+        });
+        await this.emit({
+          type: "session.disconnected",
+          providerId: this.providerId,
+          reason: message,
+          recoverable: true
         });
       } finally {
         this.reconnecting = null;
