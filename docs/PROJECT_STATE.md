@@ -19,12 +19,13 @@ Real names, private biography, relationship details, credentials, recordings and
 - physical firmware WebSocket handshake and Opus framing;
 - session-scoped Opus/PCM transcoding using production `libopus-wasm`;
 - Gemini Live realtime voice adapter;
+- GPT-Live native full-duplex voice adapter with Responses delegation, Nara Action Runtime function tools, typed input, graceful close and separate voice-duration/backend-token usage;
 - provider-neutral chained STT -> BrainProvider -> Action Runtime tools -> TTS voice adapter with bounded turn buffering and cancellation;
 - OpenAI-compatible STT and raw-PCM TTS adapters that can target hosted or local compatible gateways;
 - provider-neutral `VoiceProvider` / `VoiceSession` boundary;
 - ordered connect-time voice fallback;
 - bounded playback pacing, interruption and barge-in lifecycle;
-- provider usage/token accounting including cached versus uncached input where available;
+- provider usage accounting including cached versus uncached backend tokens where available and cumulative live-session voice seconds for duration-billed providers;
 - provider-neutral Action Runtime with cancellation, compact tool schemas and fail-closed sensitive-action authorization;
 - sensitive tools stay hidden/denied unless a session installs an explicit authorizer; firmware/phone bridges expose session-aware policy hooks;
 - firmware MCP compatibility adapter isolated behind compact Nara aliases;
@@ -276,7 +277,7 @@ not sit in the realtime voice critical path. Remaining ecosystem expansion is
 non-blocking:
 
 - additional search adapters beyond the implemented SearXNG path where deployment needs them;
-- additional native voice providers such as GPT Live and additional STT/TTS adapters;
+- additional native voice providers beyond Gemini/GPT-Live and additional STT/TTS adapters;
 - reminders/calendar/home automation connectors;
 - richer local-network STT/LLM/TTS.
 

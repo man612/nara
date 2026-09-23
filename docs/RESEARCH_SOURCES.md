@@ -433,3 +433,41 @@ References:
 - https://developers.openai.com/api/reference/cli/resources/audio/subresources/transcriptions/methods/create
 - https://developers.openai.com/api/reference/cli/resources/audio/subresources/speech/methods/create
 - https://developers.openai.com/api/docs/guides/text-to-speech
+
+## GPT-Live native voice and Responses delegation
+
+Purpose: add a second native realtime voice route without coupling Nara's
+device protocol or Action Runtime to OpenAI.
+
+Useful findings:
+
+- GPT-Live server-owned audio connects over
+  `wss://api.openai.com/v1/live/sessions` and starts with `session.start`;
+- Live WebSockets support raw mono signed PCM16 at both 24 kHz and 16 kHz; Nara
+  uses 16 kHz to match its existing gateway uplink;
+- Responses delegation lets GPT-Live handle spoken interaction while a
+  separately configured backend model performs reasoning/tool selection;
+- custom function results return as `response.item.create` items, then
+  `response.create` continues delegated work;
+- typed values can be queued as Responses user-message input items;
+- GPT-Live has no per-utterance output-audio-done event, so applications track
+  playback state themselves;
+- interrupting speech does not inherently cancel backend work;
+- `session.usage.updated` reports cumulative voice duration in seconds, while
+  nested `response.completed` events report backend token usage separately.
+
+Decision:
+
+Implement GPT-Live as an optional native `VoiceProvider`. Preserve Nara's
+separate Action Runtime authorization/cancellation boundary, expose cumulative
+voice seconds separately from delegated backend tokens, and keep Gemini Live
+plus chained voice as replaceable routes.
+
+References:
+
+- https://developers.openai.com/api/docs/guides/voice-websockets
+- https://developers.openai.com/api/docs/guides/live-delegation
+- https://developers.openai.com/api/docs/guides/live-conversations
+- https://developers.openai.com/api/docs/guides/live-prompting
+- https://developers.openai.com/api/docs/guides/voice-latency-cost
+- https://developers.openai.com/api/docs/models/gpt-live-1

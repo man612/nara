@@ -220,3 +220,26 @@ Decision:
 
 This is an operational reliability rule, not a relaxation of testing. Every PR
 still receives CI, and merged `main` receives a post-merge CI run.
+
+## 2026-09-23 — GPT-Live uses Responses delegation
+
+**Status:** accepted
+
+Nara's second native full-duplex voice adapter is GPT-Live over the server-side
+Live WebSocket. The device protocol remains provider-neutral.
+
+Consequences:
+
+- the gateway uses supported mono PCM16 at 16 kHz, matching Nara's uplink;
+- GPT-Live owns conversational speech while a configured Responses model owns
+  delegated reasoning and Nara function-tool selection;
+- Nara's Action Runtime remains the permission/execution boundary for custom
+  functions;
+- spoken interruption and tool/action cancellation remain separate lifecycles;
+- GPT-Live voice duration and delegated backend token usage are accounted
+  separately;
+- remote/typed text is queued as a Responses user item and explicitly
+  continued with `response.create`;
+- Gemini Live and chained voice remain available behind the same
+  `VoiceProvider` contract, so GPT-Live is optional rather than a new core
+  dependency.

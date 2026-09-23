@@ -7,6 +7,8 @@ Provider choice is configuration, not architecture.
 Implemented production adapters:
 
 - `gemini-live`: native Gemini Live audio adapter.
+- `openai-live`: native GPT-Live WebSocket adapter using Responses
+  delegation for backend reasoning and Nara Action Runtime function tools.
 - `chained`: bounded STT -> BrainProvider -> TTS turn runtime. It preserves
   Action Runtime tool calls and can use authenticated cloud endpoints or
   unauthenticated local OpenAI-compatible speech gateways.
@@ -22,7 +24,6 @@ Implemented test adapter:
 
 Planned adapters:
 
-- `openai-live`: native full-duplex GPT-Live adapter.
 - Pipecat-backed realtime pipelines where their ecosystem is useful.
 
 Do not put planned adapter IDs into an active provider route until their adapter exists in `src/provider-registry.ts`.
@@ -54,7 +55,7 @@ Brain providers use an ordered request-time fallback chain.
 
 Voice providers now use an ordered connect-time fallback chain. When a configured voice provider cannot be constructed or cannot open a session, Nara tries the next configured voice provider. A successfully opened realtime session is not migrated to another provider in the middle of a conversation yet.
 
-Only configure fallback IDs whose adapters are actually implemented. The example configuration keeps voice fallbacks empty by default so deployments explicitly choose STT/TTS endpoints before enabling the implemented `chained` route.
+Only configure fallback IDs whose adapters are actually implemented. The example configuration keeps voice fallbacks empty by default so deployments explicitly opt into GPT-Live credentials or choose STT/TTS endpoints before enabling the implemented alternatives.
 
 ## Deployment
 

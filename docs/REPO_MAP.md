@@ -87,6 +87,7 @@ The current file adapter is a replaceable first implementation, not permission t
 - `src/providers/brain/openai-compatible.ts` — common text brain adapter for compatible APIs.
 - `src/providers/brain/fallback.ts` — ordered fallback chain.
 - `src/providers/voice/gemini-live.ts` — raw Gemini Live v1beta provider adapter, usage normalization and session resumption.
+- `src/providers/voice/openai-live.ts` — GPT-Live WebSocket adapter with Responses delegation, Action Runtime tools and separate duration/backend usage.
 - `src/providers/voice/chained.ts` — bounded STT -> brain -> Action Runtime tool -> TTS voice session with cancellation.
 - `src/providers/stt/openai-compatible.ts` — PCM16 -> WAV multipart transcription adapter.
 - `src/providers/tts/openai-compatible.ts` — text -> raw PCM speech adapter.
@@ -134,6 +135,7 @@ The current file adapter is a replaceable first implementation, not permission t
 - `tests/audio-codec.test.ts`
 - `tests/libopus-wasm.test.ts`
 - `tests/gemini-live.test.ts`
+- `tests/openai-live.test.ts`
 - `tests/chained-voice.test.ts`
 - `tests/audio-provider-adapters.test.ts`
 - `tests/brain-tool-turns.test.ts`

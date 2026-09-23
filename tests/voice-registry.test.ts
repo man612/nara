@@ -9,6 +9,7 @@ import type { ProvidersConfig } from "../src/config/providers.js";
 afterEach(() => {
   delete process.env.NARA_TEST_GEMINI_KEY;
   delete process.env.NARA_TEST_GEMINI_BACKUP_KEY;
+  delete process.env.NARA_TEST_OPENAI_KEY;
 });
 
 describe("voice provider registry", () => {
@@ -97,6 +98,45 @@ describe("voice provider registry", () => {
     } satisfies ProvidersConfig;
 
     expect(createVoiceChain(config).id).toBe("voice-fallback");
+  });
+
+  it("constructs GPT-Live with a delegated Responses backend", () => {
+    process.env.NARA_TEST_OPENAI_KEY = "openai-secret";
+
+    const provider = createVoiceProvider("openai-live", {
+      kind: "voice",
+      adapter: "openai-live",
+      model: "gpt-live-1",
+      backend_model: "gpt-5.6-luna",
+      voice: "marin",
+      api_key_env: "NARA_TEST_OPENAI_KEY",
+      system_instruction: "Be concise.",
+      backend_instructions: "Use Nara tools when needed."
+    });
+
+    expect(provider.id).toBe("openai-live");
+  });
+
+  it("fails early when GPT-Live credentials or backend model are missing", () => {
+    expect(() =>
+      createVoiceProvider("openai-live", {
+        kind: "voice",
+        adapter: "openai-live",
+        model: "gpt-live-1",
+        backend_model: "gpt-5.6-luna",
+        api_key_env: "NARA_TEST_OPENAI_KEY"
+      })
+    ).toThrow(/missing API key/);
+
+    process.env.NARA_TEST_OPENAI_KEY = "openai-secret";
+    expect(() =>
+      createVoiceProvider("openai-live", {
+        kind: "voice",
+        adapter: "openai-live",
+        model: "gpt-live-1",
+        api_key_env: "NARA_TEST_OPENAI_KEY"
+      })
+    ).toThrow(/missing backend_model/);
   });
 
   it("constructs the chained STT -> brain -> TTS route", () => {
