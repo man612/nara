@@ -82,3 +82,16 @@ Before committing:
   separated from Nara's ownership claim.
 - Unsolicited external contributions are not accepted by default; read
   CONTRIBUTING.md before merging third-party work.
+
+
+## GitHub / CI efficiency
+
+Treat GitHub as a rate-limited remote service, not a local filesystem.
+
+- Batch coherent multi-file changes into one commit when practical; do not create one commit per edited file.
+- Prefer Git tree/commit/ref batching for API-driven multi-file edits when the available tooling supports it.
+- Read known files once and reuse their content/SHAs instead of repeatedly searching or refetching them.
+- Avoid polling GitHub Actions. Finish the code/test/docs batch first, push once, then check the resulting CI run; inspect jobs/logs only when the run fails.
+- Do not push another commit merely to observe CI progress. Push again only when there is an actual fix/change.
+- Feature branches with pull requests should rely on pull-request CI; ordinary push CI is reserved for `main` so the same feature SHA is not validated twice.
+- On GitHub `403`/`429` throttling, stop retrying immediately. Respect provider backoff / retry guidance and resume with fewer, batched requests.

@@ -1,7 +1,12 @@
 name: ci
 
 on:
+  # Feature branches are validated through pull_request only. Running both
+  # push + pull_request on the same feature commit duplicated CI work and
+  # amplified GitHub API/Actions churn during active development.
   push:
+    branches:
+      - main
   pull_request:
 
 concurrency:
