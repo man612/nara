@@ -133,29 +133,44 @@ export function createPasskeyHttpHandler(options: {
           error: "method not allowed"
         });
       }
-      if (!requireAdmin(request)) {
+      const admin = requireAdmin(request);
+      const viewer = admin ? undefined : requireViewer(request);
+      if (!admin && !viewer) {
         return json(response, 401, {
           ok: false,
-          error: "admin authorization required"
+          error: "admin or viewer authorization required"
         });
       }
       try {
         const body = await readJson(request);
+        const personId = viewer
+          ? viewer.personId
+          : typeof body.personId === "string"
+            ? body.personId.trim()
+            : "";
+        const accountId = viewer
+          ? viewer.accountId
+          : typeof body.accountId === "string"
+            ? body.accountId.trim()
+            : undefined;
+
         if (
-          typeof body.personId !== "string" ||
-          !body.personId.trim() ||
-          (body.accountId !== undefined &&
-            (typeof body.accountId !== "string" ||
-              !body.accountId.trim()))
+          !personId ||
+          (viewer &&
+            ((body.personId !== undefined &&
+              body.personId !== viewer.personId) ||
+             (body.accountId !== undefined &&
+              body.accountId !== viewer.accountId)))
         ) {
-          return json(response, 400, {
+          return json(response, 403, {
             ok: false,
-            error: "valid personId/accountId required"
+            error: "viewer may enroll passkeys only for itself"
           });
         }
+
         const profile = eligibleProfile(
           options.directory,
-          body.personId
+          personId
         );
         if (!profile) {
           return json(response, 404, {
@@ -170,9 +185,7 @@ export function createPasskeyHttpHandler(options: {
             : undefined;
         const enrollment = await options.passkeys.issueEnrollment({
           personId: profile.personId,
-          ...(typeof body.accountId === "string"
-            ? { accountId: body.accountId.trim() }
-            : {}),
+          ...(accountId ? { accountId } : {}),
           ...(ttlMs !== undefined ? { ttlMs } : {})
         });
         return json(response, 201, {
@@ -376,35 +389,53 @@ export function createPasskeyHttpHandler(options: {
     }
 
     if (url.pathname === "/api/identity/passkeys") {
-      if (!requireAdmin(request)) {
+      const admin = requireAdmin(request);
+      const viewer = admin ? undefined : requireViewer(request);
+      if (!admin && !viewer) {
         return json(response, 401, {
           ok: false,
-          error: "admin authorization required"
+          error: "admin or viewer authorization required"
         });
       }
 
       if (request.method === "GET") {
-        const personId = url.searchParams.get("personId");
-        if (!personId) {
+        const requestedPersonId = url.searchParams.get("personId");
+        if (
+          viewer &&
+          requestedPersonId &&
+          requestedPersonId !== viewer.personId
+        ) {
+          return json(response, 403, {
+            ok: false,
+            error: "viewer may list only its own passkeys"
+          });
+        }
+
+        const passkeys = viewer
+          ? options.passkeys.listForViewer(viewer)
+          : requestedPersonId
+            ? options.passkeys.listForPerson(requestedPersonId)
+            : [];
+
+        if (!viewer && !requestedPersonId) {
           return json(response, 400, {
             ok: false,
             error: "personId required"
           });
         }
+
         return json(response, 200, {
           ok: true,
-          passkeys: options.passkeys
-            .listForPerson(personId)
-            .map((record) => ({
-              credentialId: record.credentialId,
-              algorithm: record.algorithm,
-              transports: record.transports ?? [],
-              createdAt: record.createdAt,
-              updatedAt: record.updatedAt,
-              ...(record.lastUsedAt
-                ? { lastUsedAt: record.lastUsedAt }
-                : {})
-            }))
+          passkeys: passkeys.map((record) => ({
+            credentialId: record.credentialId,
+            algorithm: record.algorithm,
+            transports: record.transports ?? [],
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+            ...(record.lastUsedAt
+              ? { lastUsedAt: record.lastUsedAt }
+              : {})
+          }))
         });
       }
 
@@ -418,12 +449,29 @@ export function createPasskeyHttpHandler(options: {
           });
         }
         try {
-          await options.passkeys.revoke(credentialId);
+          if (viewer) {
+            await options.passkeys.revokeForViewer(
+              credentialId,
+              viewer
+            );
+          } else {
+            await options.passkeys.revoke(credentialId);
+          }
           return json(response, 200, { ok: true });
-        } catch {
-          return json(response, 404, {
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "passkey management failed";
+          if (message.includes("last active passkey")) {
+            return json(response, 409, {
+              ok: false,
+              error: message
+            });
+          }
+          return json(response, viewer ? 403 : 404, {
             ok: false,
-            error: "unknown passkey"
+            error: message
           });
         }
       }

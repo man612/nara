@@ -1114,6 +1114,41 @@ export class PasskeyRegistry {
       .map((record) => structuredClone(record));
   }
 
+  listForViewer(viewer: HumanViewerIdentity): PasskeyRecord[] {
+    return this.listForPerson(viewer.personId).filter(
+      (record) => record.accountId === viewer.accountId
+    );
+  }
+
+  async revokeForViewer(
+    credentialIdInput: string,
+    viewer: HumanViewerIdentity
+  ): Promise<void> {
+    this.assertStorageHealthy();
+    const credentialId = credentialIdInput.trim();
+    const record = this.passkeys.get(credentialId);
+    if (
+      !record ||
+      record.revokedAt ||
+      record.personId !== viewer.personId ||
+      record.accountId !== viewer.accountId
+    ) {
+      throw new Error("Passkey is not available to this viewer");
+    }
+
+    const active = this.listForViewer(viewer);
+    if (active.length <= 1) {
+      throw new Error(
+        "Cannot revoke the last active passkey; add a backup passkey first"
+      );
+    }
+
+    const now = new Date(this.now()).toISOString();
+    record.revokedAt = now;
+    record.updatedAt = now;
+    await this.persist();
+  }
+
   async revoke(credentialIdInput: string): Promise<void> {
     this.assertStorageHealthy();
     const credentialId = credentialIdInput.trim();

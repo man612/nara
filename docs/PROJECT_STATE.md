@@ -242,9 +242,9 @@ The passkey-first strong-viewer path is implemented: WebAuthn registration/authe
 
 Remaining hardening is product/operations work:
 
-- recovery and account-lifecycle UX beyond the legacy bootstrap/recovery credential;
-- production RP-ID/origin configuration and deployment checks;
-- reset/transfer/revoke UX around trusted viewer grants;
+- browser-facing visual polish around the implemented passkey backup/revoke and device grant controls;
+- account recovery when every strong authenticator is lost remains an operator/original-identity-proofing flow rather than a weaker automatic factor;
+- transfer semantics between separate human accounts remain a deliberate administrative workflow;
 - hardware-in-the-loop validation of the physical unlock/relock flow.
 
 ### P2 — isolated-device utility/capsule UX
@@ -317,7 +317,7 @@ For optional person-tracking gaze, the base Waveshare board has no camera. An ex
 
 Still intentionally open:
 
-- production passkey recovery/account-lifecycle UX;
+- visual/account-transfer polish around the implemented strong passkey lifecycle;
 - encryption-at-rest/key ownership for private memory;
 - encryption/authenticity policy for private capsule/assets at rest and on removable media;
 - exact local-network Indonesian STT/TTS/LLM stack;
