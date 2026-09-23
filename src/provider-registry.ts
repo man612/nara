@@ -15,6 +15,7 @@ import { OpenAICompatibleTts } from "./providers/tts/openai-compatible.js";
 import { ChainedVoiceProvider } from "./providers/voice/chained.js";
 import { FallbackVoiceProvider } from "./providers/voice/fallback.js";
 import { GeminiLiveVoiceProvider } from "./providers/voice/gemini-live.js";
+import { OpenAILiveVoiceProvider } from "./providers/voice/openai-live.js";
 
 function providerApiKey(
   definition: ProviderDefinition
@@ -159,6 +160,34 @@ export function createVoiceProvider(
       model: definition.model,
       inputTranscription: definition.input_transcription === true,
       outputTranscription: definition.output_transcription === true
+    });
+  }
+
+  if (definition.adapter === "openai-live") {
+    if (!definition.model) {
+      throw new Error(`Provider ${id} is missing model`);
+    }
+    if (!definition.backend_model) {
+      throw new Error(`Provider ${id} is missing backend_model`);
+    }
+    const apiKey = providerApiKey(definition);
+    if (!apiKey) {
+      throw new Error(
+        `Provider ${id} is missing API key from ${definition.api_key_env ?? "api_key_env"}`
+      );
+    }
+
+    return new OpenAILiveVoiceProvider(id, {
+      apiKey,
+      model: definition.model,
+      backendModel: definition.backend_model,
+      ...(definition.voice ? { voice: definition.voice } : {}),
+      ...(definition.system_instruction
+        ? { systemInstruction: definition.system_instruction }
+        : {}),
+      ...(definition.backend_instructions
+        ? { backendInstructions: definition.backend_instructions }
+        : {})
     });
   }
 

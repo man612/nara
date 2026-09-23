@@ -39,9 +39,9 @@ microphone/speaker streaming.
 
 ## Provider strategy
 
-- Voice: Gemini Live and a provider-neutral chained STT -> brain -> TTS path
-  are implemented behind the same contract; GPT-Live and Pipecat-backed
-  runtimes remain optional future adapters.
+- Voice: Gemini Live, GPT-Live with Responses delegation, and a
+  provider-neutral chained STT -> brain -> TTS path are implemented behind the
+  same contract; Pipecat-backed runtimes remain optional future adapters.
 - Brain: any OpenAI-compatible endpoint; DeepSeek, Hermes, OpenRouter, and
   local gateways can share one adapter.
 - Actions: provider-neutral routing/cancellation; physical-device tools execute
@@ -89,11 +89,13 @@ Nara's software core is a real end-to-end system rather than an architecture
 sketch.
 
 The physical realtime voice path supports firmware WebSocket/Opus framing,
-session-scoped Opus/PCM transcoding, Gemini Live, an opt-in chained
-STT -> brain -> TTS runtime, provider-neutral voice-session contracts,
+session-scoped Opus/PCM transcoding, Gemini Live, GPT-Live with delegated
+Responses tools/reasoning, an opt-in chained STT -> brain -> TTS runtime,
+provider-neutral voice-session contracts,
 connect-time fallback, bounded playback pacing,
-interruption/barge-in lifecycle, compact tool calls, normalized usage
-accounting, and measured turn-end -> first-provider-audio -> first-device-audio
+interruption/barge-in lifecycle, compact tool calls, token plus live-session
+duration usage accounting, and measured turn-end -> first-provider-audio ->
+first-device-audio
 latency. Automated coverage includes a real-Opus firmware-to-provider round
 trip and a production Node 24 Alpine image smoke test.
 

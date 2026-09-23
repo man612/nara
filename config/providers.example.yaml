@@ -1,8 +1,7 @@
 voice:
   primary: gemini-live
-  # The chained adapter is implemented but opt-in because deployments must
-  # choose their own STT/TTS endpoints. Add "chained" here after configuring
-  # the speech providers below. GPT-Live remains roadmap work.
+  # GPT-Live and chained voice are both implemented but opt-in. Add one here
+  # only after configuring its credentials/endpoints below.
   fallbacks: []
 
 brain:
@@ -29,6 +28,18 @@ providers:
     # Transcription creates extra provider output/usage. Keep it opt-in.
     input_transcription: false
     output_transcription: false
+
+  # Optional second native full-duplex route. GPT-Live delegates reasoning
+  # and Nara function tools to the configured Responses backend.
+  openai-live:
+    kind: voice
+    adapter: openai-live
+    model: ${OPENAI_LIVE_MODEL:-gpt-live-1}
+    backend_model: ${OPENAI_LIVE_BACKEND_MODEL:-gpt-5.6-luna}
+    voice: ${OPENAI_LIVE_VOICE:-marin}
+    api_key_env: OPENAI_API_KEY
+    system_instruction: ${OPENAI_LIVE_SYSTEM_INSTRUCTION:-Be concise and natural. Delegate tool or reasoning work instead of guessing.}
+    backend_instructions: ${OPENAI_LIVE_BACKEND_INSTRUCTIONS:-Use available Nara tools when they are necessary to answer accurately.}
 
   # Optional cost/self-host friendly voice path. It reuses the brain route
   # above and preserves Nara Action Runtime tool calls.

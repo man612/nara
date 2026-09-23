@@ -45,6 +45,11 @@ export type ProviderUsage = {
   totalTokens?: number;
   cachedInputTokens?: number;
   uncachedInputTokens?: number;
+  /**
+   * Cumulative realtime/live voice-session duration snapshot when the
+   * provider bills voice by elapsed session time rather than tokens.
+   */
+  voiceSeconds?: number;
 };
 
 export type BrainResponse = {

@@ -80,7 +80,7 @@ async function createFirmwareVoiceFactory(
     codecFactory: createLibopusWasmCodecFactory(),
     onUsage: (session, usage) => {
       console.log(
-        `[firmware:${session.sessionId}] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`
+        `[firmware:${session.sessionId}] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"} voiceSeconds=${usage.voiceSeconds ?? "?"}`
       );
       companion.recordVoiceUsage(
         "firmware:" + session.sessionId,
@@ -187,7 +187,7 @@ async function createPhoneVoiceFactory(
     ],
     onUsage: (usage) => {
       console.log(
-        `[phone] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"}`
+        `[phone] voice usage route=${voiceProvider.id} input=${usage.inputTokens ?? "?"} output=${usage.outputTokens ?? "?"} cached=${usage.cachedInputTokens ?? "?"} total=${usage.totalTokens ?? "?"} voiceSeconds=${usage.voiceSeconds ?? "?"}`
       );
       companion.recordVoiceUsage(
         "phone:" + voiceProvider.id,

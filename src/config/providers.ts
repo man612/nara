@@ -11,6 +11,8 @@ const providerSchema = z.object({
   kind: z.string(),
   adapter: z.string(),
   model: z.string().optional(),
+  backend_model: z.string().optional(),
+  backend_instructions: z.string().optional(),
   base_url: z.string().optional(),
   api_key_env: z.string().optional(),
   timeout_ms: z.number().int().min(250).max(120_000).optional(),

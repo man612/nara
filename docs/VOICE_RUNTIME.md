@@ -16,10 +16,8 @@ Native speech-to-speech providers are the preferred path when low latency, barge
 
 Implemented production adapters:
 - Gemini Live for native speech-to-speech.
+- GPT-Live for native full-duplex speech with Responses delegation.
 - Chained STT -> BrainProvider -> TTS for portable/cost-aware turn-based voice.
-
-Planned native adapter:
-- GPT-Live.
 
 The Gemini Live adapter uses the documented raw v1beta WebSocket edge rather than exposing a provider SDK to the rest of Nara.
 
@@ -36,6 +34,29 @@ Current Gemini baseline:
 
 The adapter uses the existing `ws` dependency. The raw protocol is intentionally contained inside `src/providers/voice/gemini-live.ts`, so moving to the Google SDK later would not affect the device or codec contracts.
 
+### GPT-Live
+
+The GPT-Live adapter connects server-side to `/v1/live/sessions` and keeps the
+OpenAI credential out of firmware. Nara deliberately configures mono PCM16 at
+16 kHz, which GPT-Live supports directly and which matches the gateway uplink,
+so the provider boundary does not require an extra input resample.
+
+GPT-Live handles the spoken full-duplex conversation while a configured
+Responses backend handles reasoning and Nara function tools. Function results
+round-trip through `response.item.create` followed by `response.create`.
+Typed/remote text uses the same delegated Responses input-item path.
+
+Speech interruption only stops/suppresses spoken output. It does **not** cancel
+pending Action Runtime work; tool cancellation remains an explicit, separate
+lifecycle. Backend token usage and GPT-Live cumulative voice-session seconds
+are reported separately because they are billed separately. Duplicate backend
+completion usage is ignored by response ID.
+
+GPT-Live does not expose a per-utterance audio-done event. Nara therefore uses
+a short configurable output-idle boundary for its provider-neutral
+`output.completed` event while the device playback queue remains the source
+of truth for what has actually been played.
+
 Each adapter implements the same `VoiceProvider` and `VoiceSession` contracts. Provider-specific event formats stop at the adapter boundary.
 
 ## Voice fallback
@@ -44,10 +65,11 @@ A configured route may contain a primary voice provider plus fallback providers.
 
 Fallback currently happens while opening a voice session: if the primary cannot be constructed or cannot connect, Nara tries the next configured provider. This is intentionally separate from in-session recovery. Once a realtime conversation has opened on one provider, Nara does not migrate that active conversation to a different provider yet.
 
-The example configuration activates Gemini Live by default. The implemented
-`chained` adapter is opt-in because each deployment must deliberately choose
-its STT/TTS endpoints. Once configured, it can be added to `voice.fallbacks`
-without changing firmware. GPT-Live remains planned.
+The example configuration activates Gemini Live by default. Both
+`openai-live` and `chained` are implemented but opt-in: GPT-Live requires
+OpenAI credentials/backend selection, while chained voice requires deliberate
+STT/TTS endpoint selection. Either can be added to `voice.fallbacks` without
+changing firmware.
 
 ## Chained voice
 
