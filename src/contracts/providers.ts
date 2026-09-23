@@ -117,6 +117,17 @@ export type VoiceSessionEvent =
   | { type: "interrupted" }
   | { type: "tool.call"; name: string; arguments: unknown; callId?: string }
   | { type: "tool.cancel"; callIds: string[] }
+  | {
+      type: "session.disconnected";
+      providerId: string;
+      reason: string;
+      recoverable: boolean;
+    }
+  | {
+      type: "session.recovered";
+      fromProviderId: string;
+      toProviderId: string;
+    }
   | { type: "usage"; usage: ProviderUsage }
   | { type: "error"; message: string };
 

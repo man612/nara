@@ -63,7 +63,28 @@ Each adapter implements the same `VoiceProvider` and `VoiceSession` contracts. P
 
 A configured route may contain a primary voice provider plus fallback providers.
 
-Fallback currently happens while opening a voice session: if the primary cannot be constructed or cannot connect, Nara tries the next configured provider. This is intentionally separate from in-session recovery. Once a realtime conversation has opened on one provider, Nara does not migrate that active conversation to a different provider yet.
+Fallback happens both at initial connection and after a terminal provider
+disconnect, with deliberately different safety rules.
+
+At initial connection, Nara tries the configured providers in order. During an
+active physical/phone session, provider-native recovery runs first (for example,
+Gemini session resumption). Only when the provider reports terminal
+`session.disconnected` does Nara mark that provider dead.
+
+Cross-provider recovery is deferred until the **next user input**. Nara does
+not replay the failed audio/text turn, copy half-finished model context, or
+deliver late tool results into the replacement session. Pending identified
+tool calls are cancelled through Action Runtime, stale provider events are
+ignored by session generation, and active playback is interrupted. The next
+input tries the next configured provider, wrapping around to the previous
+provider last. A single-provider route therefore reconnects that provider.
+
+Non-recoverable terminations (for example a provider safety/content terminal
+reason) fail closed and are not silently bypassed by opening another provider.
+
+This keeps the physical/phone session alive while treating provider
+conversation context as disposable unless a provider has its own documented
+resumption mechanism.
 
 The example configuration activates Gemini Live by default. Both
 `openai-live` and `chained` are implemented but opt-in: GPT-Live requires

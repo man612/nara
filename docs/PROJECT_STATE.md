@@ -23,7 +23,7 @@ Real names, private biography, relationship details, credentials, recordings and
 - provider-neutral chained STT -> BrainProvider -> Action Runtime tools -> TTS voice adapter with bounded turn buffering and cancellation;
 - OpenAI-compatible STT and raw-PCM TTS adapters that can target hosted or local compatible gateways;
 - provider-neutral `VoiceProvider` / `VoiceSession` boundary;
-- ordered connect-time voice fallback;
+- ordered connect-time voice fallback plus safe turn-boundary in-session recovery/failover after terminal provider disconnects;
 - bounded playback pacing, interruption and barge-in lifecycle;
 - provider usage accounting including cached versus uncached backend tokens where available and cumulative live-session voice seconds for duration-billed providers;
 - provider-neutral Action Runtime with cancellation, compact tool schemas and fail-closed sensitive-action authorization;

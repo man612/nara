@@ -95,3 +95,5 @@ Treat GitHub as a rate-limited remote service, not a local filesystem.
 - Do not push another commit merely to observe CI progress. Push again only when there is an actual fix/change.
 - Feature branches with pull requests should rely on pull-request CI; ordinary push CI is reserved for `main` so the same feature SHA is not validated twice.
 - On GitHub `403`/`429` throttling, stop retrying immediately. Respect provider backoff / retry guidance and resume with fewer, batched requests.
+
+- Treat realtime voice-provider failover as a turn-boundary operation: never replay uncertain audio/text, never route late tool results into a replacement session, and never bypass a non-recoverable provider termination by silently switching providers.

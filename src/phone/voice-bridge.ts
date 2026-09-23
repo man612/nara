@@ -139,6 +139,17 @@ class PhoneVoiceSession implements PhoneSessionHandler {
         }
         this.actions?.cancel(event.callIds);
         return;
+      case "session.disconnected":
+        await this.reportError(
+          new Error(
+            `Voice provider ${event.providerId} disconnected: ${event.reason}`
+          )
+        );
+        return;
+
+      case "session.recovered":
+        return;
+
       case "error":
         await this.reportError(new Error(event.message));
         return;
