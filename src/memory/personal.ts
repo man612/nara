@@ -1,6 +1,12 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
+import {
+  isEncryptedPrivateDataEnvelope,
+  openPrivateJson,
+  sealPrivateJson,
+  type PrivateDataKeyring
+} from "../security/private-data.js";
 
 export type PersonalMemorySensitivity =
   | "private"
@@ -157,12 +163,21 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
 }
 
+export type FilePersonalMemoryStoreOptions = {
+  encryption?: PrivateDataKeyring;
+};
+
+const PERSONAL_MEMORY_ENCRYPTION_PURPOSE = "personal-memory";
+
 export class FilePersonalMemoryStore implements PersonalMemoryStore {
   private facts: Map<string, PersonalMemoryFact> | undefined;
   private loadPromise: Promise<void> | undefined;
   private writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(private readonly filePath: string) {}
+  constructor(
+    private readonly filePath: string,
+    private readonly options: FilePersonalMemoryStoreOptions = {}
+  ) {}
 
   async upsert(fact: PersonalMemoryFact): Promise<void> {
     await this.ensureLoaded();
@@ -228,7 +243,30 @@ export class FilePersonalMemoryStore implements PersonalMemoryStore {
   private async load(): Promise<void> {
     try {
       const raw = await readFile(this.filePath, "utf8");
-      const parsed = PersistedMemorySchema.safeParse(JSON.parse(raw) as unknown);
+      const stored = JSON.parse(raw) as unknown;
+      let snapshot: unknown = stored;
+      let rewriteWithActiveKey = false;
+
+      if (isEncryptedPrivateDataEnvelope(stored)) {
+        const keyring = this.options.encryption;
+        if (!keyring) {
+          throw new Error(
+            "Personal memory is encrypted but no private-data keyring is configured"
+          );
+        }
+        const opened = openPrivateJson(
+          stored,
+          keyring,
+          PERSONAL_MEMORY_ENCRYPTION_PURPOSE
+        );
+        snapshot = opened.value;
+        rewriteWithActiveKey =
+          opened.keyId !== keyring.activeKeyId;
+      } else if (this.options.encryption) {
+        rewriteWithActiveKey = true;
+      }
+
+      const parsed = PersistedMemorySchema.safeParse(snapshot);
 
       if (!parsed.success) {
         throw new Error(
@@ -244,6 +282,10 @@ export class FilePersonalMemoryStore implements PersonalMemoryStore {
           structuredClone(normalizedFact(fact))
         ] as const)
       );
+
+      if (rewriteWithActiveKey) {
+        await this.persist();
+      }
     } catch (error) {
       if (isErrnoException(error) && error.code === "ENOENT") {
         this.facts = new Map();
@@ -260,7 +302,14 @@ export class FilePersonalMemoryStore implements PersonalMemoryStore {
       facts: [...this.facts!.values()]
     };
 
-    const payload = JSON.stringify(snapshot, null, 2) + "\n";
+    const stored = this.options.encryption
+      ? sealPrivateJson(
+          snapshot,
+          this.options.encryption,
+          PERSONAL_MEMORY_ENCRYPTION_PURPOSE
+        )
+      : snapshot;
+    const payload = JSON.stringify(stored, null, 2) + "\n";
     const directory = dirname(this.filePath);
     const temporaryPath = `${this.filePath}.${process.pid}.tmp`;
 

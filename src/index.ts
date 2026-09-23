@@ -2,6 +2,7 @@ import "dotenv/config";
 import { createLibopusWasmCodecFactory } from "./audio/libopus-wasm.js";
 import { loadProvidersConfig } from "./config/providers.js";
 import { validatePasskeyDeploymentSecurity } from "./config/deployment-security.js";
+import { privateDataKeyringFromEnvironment } from "./security/private-data.js";
 import { createPersonalContentHttpHandler } from "./content/http.js";
 import { CompanionRuntime } from "./companion/runtime.js";
 import { PersonalContentService } from "./content/personal-content.js";
@@ -210,8 +211,27 @@ async function main(): Promise<void> {
 
   const personalMemoryFile = process.env.NARA_PERSONAL_MEMORY_FILE;
   const memorySubjectId = process.env.NARA_MEMORY_SUBJECT_ID;
+  const privateDataKeyring =
+    privateDataKeyringFromEnvironment(process.env);
+  const production =
+    process.env.NODE_ENV?.trim().toLowerCase() === "production";
+  if (
+    production &&
+    personalMemoryFile &&
+    !privateDataKeyring
+  ) {
+    throw new Error(
+      "Production personal memory requires " +
+        "NARA_PRIVATE_DATA_KEYS_JSON and " +
+        "NARA_PRIVATE_DATA_ACTIVE_KEY_ID"
+    );
+  }
   const personalMemoryStore = personalMemoryFile
-    ? new FilePersonalMemoryStore(personalMemoryFile)
+    ? new FilePersonalMemoryStore(personalMemoryFile, {
+        ...(privateDataKeyring
+          ? { encryption: privateDataKeyring }
+          : {})
+      })
     : undefined;
   const voiceMemory =
     personalMemoryStore && memorySubjectId
@@ -583,7 +603,7 @@ async function main(): Promise<void> {
     }
     if (voiceMemory) {
       console.log(
-        `Voice memory:      guest/public scope subject=${voiceMemory.subjectId} file=${personalMemoryFile}`
+        `Voice memory:      guest/public scope subject=${voiceMemory.subjectId} file=${personalMemoryFile} encryption=${privateDataKeyring?.activeKeyId ?? "off"}`
       );
     }
     if (speakerRuntime && peopleFile) {

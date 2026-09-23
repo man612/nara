@@ -53,9 +53,10 @@ microphone/speaker streaming.
   cancellable `web_search` tool. Hermes remains available for longer delegated
   research/browser work; DDGS, Brave, and provider-native search can be added
   behind the same contract later.
-- Memory: local-first personal memory is implemented; larger stores such as
-  PostgreSQL/pgvector can be added
-  when deployment needs them.
+- Memory: local-first personal memory is implemented with viewer filtering and
+  optional AES-256-GCM keyring encryption at rest; production file-backed
+  personal memory requires encryption. Larger stores such as PostgreSQL/
+  pgvector can be added when deployment needs them.
 - Device: the first target is Waveshare ESP32-S3-Touch-LCD-1.85B through the
   standalone nara-firmware repository.
 
@@ -157,7 +158,7 @@ The major remaining uncertainties are now physical or production-hardening
 items rather than missing core companion logic: microphone/AEC/speaker tuning,
 final gesture calibration, battery-life and polling measurements, phone/TWS
 validation on real devices, external-camera field-of-view/orientation,
-passkey recovery/account-lifecycle polish, production secure
+visual account-transfer polish, production secure
 commissioning/direct-peer mode, and optional additional
 native-voice/search/local-network providers.
 

@@ -284,3 +284,26 @@ Consequences:
   identity-proofing route, not SMS/email/voice as a weaker automatic factor;
 - production passkey configuration forbids localhost/HTTP browser origins;
 - device viewer grants remain short-lived and separately revocable.
+
+## 2026-09-23 — Personal memory is encrypted with an externally owned rotating keyring
+
+**Status:** accepted
+
+File-backed personal memory supports AES-256-GCM authenticated encryption.
+
+Consequences:
+
+- encryption keys stay outside repository/runtime data files and should come
+  from the deployment secret manager;
+- each write uses a fresh random 96-bit IV and a 128-bit GCM authentication tag;
+- the file records only the active key ID plus IV/tag/ciphertext;
+- a keyring may contain previous keys for reads while one key is active for
+  writes; opening data encrypted under an old key rewrites it under the active
+  key;
+- existing valid plaintext memory is migrated atomically after a keyring is
+  configured;
+- production startup fails if file-backed personal memory is configured without
+  a private-data keyring;
+- private capsule content is allowed on production encrypted internal flash,
+  but private removable-media content is forbidden until Nara has a distinct
+  per-device removable-media key lifecycle.

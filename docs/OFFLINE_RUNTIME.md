@@ -368,8 +368,11 @@ Production direction:
 - per-device authorization remains enforced when creating the capsule;
 - store only the recipient-authorized subset;
 - use NVS encryption for small secrets/keys;
-- evaluate ESP32-S3 flash encryption/secure boot for production;
-- encrypt or application-wrap sensitive removable-storage content rather than assuming microSD is private;
+- use the production Secure Boot + Flash Encryption profile for internal flash;
+- private offline capsules may live in the encrypted internal asset partition;
+- **do not place private capsule/media content on removable microSD in v1**;
+  removable private content requires a separate per-device key lifecycle before
+  that policy may change;
 - support remote/local revocation and wipe on transfer/reset;
 - avoid placing owner-private facts on the recipient device at all.
 
@@ -451,7 +454,7 @@ Implemented foundation:
 
 Remaining enrichment/hardening:
 
-- production revision/authenticity/signature policy;
+- production publisher-authenticity/signature policy for independently updated asset packs;
 - notes/messages beyond the current fact capsule;
 - pre-generated/recorded audio;
 - explicit reconnect refresh/sync UX;
