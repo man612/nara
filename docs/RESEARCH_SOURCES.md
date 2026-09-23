@@ -505,3 +505,29 @@ References:
 - https://ai.google.dev/gemini-api/docs/live-api/best-practices
 - https://developers.openai.com/api/docs/guides/live-conversations
 - https://developers.openai.com/api/docs/guides/voice-websockets
+
+## Passkey recovery and production WebAuthn deployment
+
+Purpose: avoid undoing passkey security through a weaker recovery path.
+
+Useful findings:
+
+- WebAuthn ceremonies require secure browser origins outside localhost and
+  validate an RP ID/origin relationship;
+- FIDO deployment guidance recommends registering additional authenticators as
+  the primary recovery method;
+- if all authenticators are lost, recovery should repeat sufficiently strong
+  identity proofing instead of falling back to a weaker everyday factor.
+
+Decision:
+
+Nara supports authenticated self-enrollment of backup passkeys, self-listing
+and self-revocation, but refuses self-service removal of the final active
+passkey. Full loss returns to the operator/original identity-proofing path.
+Production startup rejects localhost or non-HTTPS passkey origins.
+
+References:
+
+- https://www.w3.org/TR/webauthn-3/
+- https://fidoalliance.org/passkeys/
+- https://fidoalliance.org/enterprise-deployment-considerations-for-fido-passkeys/

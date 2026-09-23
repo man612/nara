@@ -184,6 +184,49 @@ describe("passkey identity HTTP", () => {
     }
   });
 
+  it("lets an authenticated viewer create a backup-passkey enrollment only for itself", async () => {
+    const ctx = await setup();
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${ctx.port}/api/identity/passkeys/enrollments`,
+        {
+          method: "POST",
+          headers: {
+            authorization:
+              "Bearer " + ctx.partnerSession.token,
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({})
+        }
+      );
+      const body = (await response.json()) as {
+        enrollmentToken?: string;
+        person?: { personId?: string };
+      };
+      expect(response.status).toBe(201);
+      expect(body.enrollmentToken).toBeTruthy();
+      expect(body.person?.personId).toBe("person:partner");
+
+      const forbidden = await fetch(
+        `http://127.0.0.1:${ctx.port}/api/identity/passkeys/enrollments`,
+        {
+          method: "POST",
+          headers: {
+            authorization:
+              "Bearer " + ctx.partnerSession.token,
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            personId: "person:creator"
+          })
+        }
+      );
+      expect(forbidden.status).toBe(403);
+    } finally {
+      await closeGateway(ctx.gateway);
+    }
+  });
+
   it("grants physical private-memory viewer only to an authorized human session", async () => {
     const ctx = await setup();
     try {

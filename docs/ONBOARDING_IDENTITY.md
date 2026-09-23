@@ -1,8 +1,8 @@
 # First-use onboarding and identity
 
-Status: device registry, one-time claim core, passkey/WebAuthn human authentication, temporary physical-device viewer grants and the first DPP Wi-Fi commissioning path are implemented; production device-side claim delivery, secure universal fallback commissioning and polished recovery/transfer UX remain staged.
+Status: device registry, one-time claim core, passkey/WebAuthn human authentication, self-service backup-passkey lifecycle, temporary physical-device viewer grants and the first DPP Wi-Fi commissioning path are implemented; production device-side claim delivery, secure universal fallback commissioning and physical onboarding polish remain staged.
 
-Last reviewed: 2026-09-21
+Last reviewed: 2026-09-23
 
 ## Product goal
 
@@ -287,3 +287,19 @@ Onboarding is ready when tests prove:
 - NIST SP 1800-36: https://csrc.nist.gov/pubs/sp/1800/36/final
 - FIDO passkeys: https://fidoalliance.org/passkeys/
 - W3C WebAuthn Level 3: https://www.w3.org/TR/webauthn-3/
+
+## Passkey recovery policy
+
+Passkey recovery must not silently reduce Nara to a weaker everyday
+authentication factor.
+
+- after passkey login, a short-lived viewer session may issue an enrollment
+  token only for that same person/account;
+- the viewer may list and revoke only its own passkeys;
+- self-service revocation cannot remove the last active passkey;
+- users should register at least two independent authenticators/passkeys
+  before treating the account as recoverable;
+- if every passkey is lost, recovery returns to the original strong
+  administrator/identity-proofing path rather than email/SMS/voice
+  impersonation;
+- production startup rejects localhost/HTTP passkey deployment settings.

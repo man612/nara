@@ -326,6 +326,66 @@ describe("PasskeyRegistry", () => {
     ).toEqual({ personId: "person:partner" });
   });
 
+  it("allows self-service passkey rotation but refuses to remove the last active passkey", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "nara-passkey-revoke-"));
+    tempDirs.push(directory);
+    const filePath = join(directory, "passkeys.json");
+    const now = new Date().toISOString();
+    await writeFile(
+      filePath,
+      JSON.stringify({
+        version: 1,
+        passkeys: [
+          {
+            credentialId: "credential-a",
+            personId: "person:partner",
+            accountId: "account:partner",
+            userHandle: "user-a",
+            publicKeySpki: "placeholder-a",
+            algorithm: "ES256",
+            counter: 0,
+            createdAt: now,
+            updatedAt: now
+          },
+          {
+            credentialId: "credential-b",
+            personId: "person:partner",
+            accountId: "account:partner",
+            userHandle: "user-b",
+            publicKeySpki: "placeholder-b",
+            algorithm: "ES256",
+            counter: 0,
+            createdAt: now,
+            updatedAt: now
+          }
+        ],
+        enrollments: []
+      }),
+      "utf8"
+    );
+    const registry = await PasskeyRegistry.open({
+      filePath,
+      rpId: "nara.example",
+      origins: ["https://nara.example"]
+    });
+    const viewer = {
+      personId: "person:partner",
+      accountId: "account:partner"
+    };
+
+    await registry.revokeForViewer("credential-a", viewer);
+    expect(
+      registry.listForViewer(viewer).map((item) => item.credentialId)
+    ).toEqual(["credential-b"]);
+
+    await expect(
+      registry.revokeForViewer("credential-b", viewer)
+    ).rejects.toThrow(/last active passkey/);
+    expect(
+      registry.listForViewer(viewer).map((item) => item.credentialId)
+    ).toEqual(["credential-b"]);
+  });
+
   it("fails closed on wrong origin and consumes no enrollment", async () => {
     const { registry } = await registryFixture();
     const enrollment = await registry.issueEnrollment({

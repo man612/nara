@@ -266,3 +266,21 @@ Consequences:
   safety by silently switching vendors;
 - conversation context remains provider-owned unless an adapter has a
   documented safe resumption mechanism.
+
+## 2026-09-23 — Passkey recovery stays at passkey strength
+
+**Status:** accepted
+
+Nara treats multiple passkeys/authenticators as the normal self-service
+recovery mechanism.
+
+Consequences:
+
+- an authenticated viewer session may create a new passkey enrollment only for
+  itself;
+- viewers may manage only their own passkeys;
+- the last active passkey cannot be removed through self-service;
+- losing every passkey falls back to the original administrator/strong
+  identity-proofing route, not SMS/email/voice as a weaker automatic factor;
+- production passkey configuration forbids localhost/HTTP browser origins;
+- device viewer grants remain short-lived and separately revocable.

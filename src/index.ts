@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { createLibopusWasmCodecFactory } from "./audio/libopus-wasm.js";
 import { loadProvidersConfig } from "./config/providers.js";
+import { validatePasskeyDeploymentSecurity } from "./config/deployment-security.js";
 import { createPersonalContentHttpHandler } from "./content/http.js";
 import { CompanionRuntime } from "./companion/runtime.js";
 import { PersonalContentService } from "./content/personal-content.js";
@@ -311,6 +312,13 @@ async function main(): Promise<void> {
     passkeyRpId !== undefined ||
     process.env.NARA_PASSKEY_ORIGINS !== undefined ||
     process.env.NARA_PASSKEY_FILE !== undefined;
+
+  validatePasskeyDeploymentSecurity({
+    production:
+      process.env.NODE_ENV?.trim().toLowerCase() === "production",
+    ...(passkeyRpId ? { rpId: passkeyRpId } : {}),
+    origins: passkeyOrigins
+  });
 
   if (
     passkeyConfigured &&
