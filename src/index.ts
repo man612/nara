@@ -15,6 +15,7 @@ import { HumanCredentialRegistry } from "./identity/human-credentials.js";
 import { createHumanAuthHttpHandler } from "./identity/human-auth-http.js";
 import { PasskeyRegistry } from "./identity/passkeys.js";
 import { createPasskeyHttpHandler } from "./identity/passkey-http.js";
+import { createAccountUiHttpHandler } from "./identity/account-ui.js";
 import { DeviceViewerGrantRegistry } from "./identity/device-viewer-grants.js";
 import { SpeakerIdentityService } from "./identity/speaker.js";
 import { HttpSpeakerIdentityProvider } from "./identity/speaker-http.js";
@@ -521,6 +522,7 @@ async function main(): Promise<void> {
           : {})
       })
     );
+    httpHandlers.push(createAccountUiHttpHandler());
   }
 
   if (contentToken && contentSubjectId && personalMemoryStore) {
