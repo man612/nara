@@ -1,6 +1,6 @@
 # First-use onboarding and identity
 
-Status: device registry, one-time claim core, passkey/WebAuthn human authentication, self-service backup-passkey lifecycle, temporary physical-device viewer grants and the first DPP Wi-Fi commissioning path are implemented; production device-side claim delivery, secure universal fallback commissioning and physical onboarding polish remain staged.
+Status: device registry, one-time claim core, passkey/WebAuthn human authentication, self-service backup-passkey lifecycle, temporary physical-device viewer grants, explicit release-for-transfer, DPP Wi-Fi commissioning and BLE Security 2 fallback are implemented; production device-side claim delivery and physical onboarding polish remain staged.
 
 Last reviewed: 2026-09-23
 
@@ -139,7 +139,7 @@ If Nara ever accepts a spoken setup code, it should be a short-lived secondary c
 
 Wi-Fi provisioning and account claiming are related but distinct.
 
-Nara firmware already has first-boot Wi-Fi configuration, hotspot provisioning, optional ESP BLUFI, an activation state, NVS credential storage, and a runtime WebSocket token.
+Nara firmware already has first-boot Wi-Fi configuration, DPP commissioning, Espressif Network Provisioning BLE Security 2 fallback, an activation state, NVS credential storage, and a runtime WebSocket token. The inherited open hotspot/plain-HTTP path is disabled on the first Waveshare production target.
 
 ### Wi-Fi Easy Connect / DPP
 
@@ -155,11 +155,14 @@ Platform support is not universal enough to make it Nara's only setup path.
 
 ESP-IDF supports SoftAP or BLE provisioning with authenticated/encrypted security schemes. Security 2 uses SRP6a plus AES-GCM and is Espressif's recommended production security version.
 
-A practical Nara hierarchy should therefore remain transport-neutral:
+The first Waveshare hierarchy is now:
 
 - DPP QR when supported;
-- secure BLE provisioning during a short setup window;
-- secure SoftAP/captive setup as universal fallback.
+- Network Provisioning BLE Security 2 during a deliberate setup window.
+
+A future private/direct-peer SoftAP UI, if added, must use its own application
+authorization rather than treating Wi-Fi provisioning as private-content
+authorization.
 
 Close the provisioning surface after success and require a deliberate local action/factory reset to reopen it.
 
@@ -254,7 +257,7 @@ Firmware provisioning branding has been cleaned up to Nara and DPP QR commission
 7. Add local physical approval to final claim. — server requirement implemented; firmware/UI claim signal remains.
 8. Connect authenticated identity to viewer resolution and personal-memory access. — implemented for passkey-authenticated phone sessions and expiring per-device trusted viewer grants.
 9. Add optional voice enrollment after secure claim works. — speaker-recognition runtime exists; user-facing enrollment/calibration UX remains.
-10. Add reset/unlink/transfer/credential-rotation tests and product UX. — credential rotation/revocation foundations are tested; full transfer/recovery UX remains.
+10. Add reset/unlink/transfer/credential-rotation tests and product UX. — credential rotation, permanent revocation and release-for-transfer are implemented/tested; browser/device-facing polish and real-device re-claim remain.
 11. Benchmark the implemented DPP path and the future secure BLE/SoftAP fallback on the real Waveshare board/phones.
 12. Polish the gift reveal dialogue/animation after the security flow is solid.
 
