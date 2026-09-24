@@ -170,6 +170,59 @@ describe("device claim registry", () => {
     expect(registry.getDeviceState("device-a")).toBe("revoked");
   });
 
+  it("release-for-transfer invalidates the old credential and clears ownership before re-claim", async () => {
+    const { registry } = await tempRegistry();
+    await registry.registerUnclaimedDevice({
+      deviceId: "device-transfer"
+    });
+    const claim =
+      await registry.beginClaim("device-transfer");
+    await registry.approveClaimFromAccount({
+      claimId: claim.claimId,
+      claimToken: claim.claimToken,
+      accountId: "account-old"
+    });
+    await registry.confirmPhysicalClaim({
+      claimId: claim.claimId,
+      deviceId: "device-transfer"
+    });
+    const first = await registry.completeClaim({
+      claimId: claim.claimId,
+      deviceId: "device-transfer"
+    });
+
+    await registry.releaseDeviceForTransfer(
+      "device-transfer"
+    );
+
+    expect(
+      registry.verifyDeviceCredential(
+        "device-transfer",
+        first.credential
+      )
+    ).toBe(false);
+    expect(
+      registry.getDevice("device-transfer")
+    ).toEqual(
+      expect.objectContaining({
+        state: "unclaimed",
+        credentialGeneration: 2
+      })
+    );
+    expect(
+      registry.getDevice("device-transfer")
+    ).not.toHaveProperty("accountId");
+    expect(
+      registry.getDevice("device-transfer")
+    ).not.toHaveProperty("role");
+
+    await expect(
+      registry.beginClaim("device-transfer")
+    ).resolves.toMatchObject({
+      claimId: expect.any(String)
+    });
+  });
+
   it("fails closed after a persistence error and recovers from the durable snapshot", async () => {
     const { registry, filePath } = await tempRegistry();
     await registry.registerUnclaimedDevice({ deviceId: "device-a" });

@@ -351,6 +351,31 @@ export class DeviceRegistry {
     };
   }
 
+  async releaseDeviceForTransfer(deviceId: string): Promise<void> {
+    this.assertStorageHealthy();
+    const device = this.devices.get(deviceId);
+    if (!device) {
+      throw new Error("Unknown device");
+    }
+    if (device.state === "revoked") {
+      throw new Error("Revoked device cannot be released for transfer");
+    }
+
+    device.state = "unclaimed";
+    delete device.credentialHash;
+    delete device.accountId;
+    delete device.role;
+    device.credentialGeneration += 1;
+    device.updatedAt = new Date(this.now()).toISOString();
+
+    for (const [claimId, claim] of this.claims) {
+      if (claim.deviceId === deviceId) {
+        this.claims.delete(claimId);
+      }
+    }
+    await this.persist();
+  }
+
   async revokeDevice(deviceId: string): Promise<void> {
     this.assertStorageHealthy();
     const device = this.devices.get(deviceId);
@@ -360,6 +385,8 @@ export class DeviceRegistry {
 
     device.state = "revoked";
     delete device.credentialHash;
+    delete device.accountId;
+    delete device.role;
     device.updatedAt = new Date(this.now()).toISOString();
     for (const [claimId, claim] of this.claims) {
       if (claim.deviceId === deviceId) {

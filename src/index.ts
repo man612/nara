@@ -7,6 +7,7 @@ import { createPersonalContentHttpHandler } from "./content/http.js";
 import { CompanionRuntime } from "./companion/runtime.js";
 import { PersonalContentService } from "./content/personal-content.js";
 import { DeviceRegistry } from "./device/registry.js";
+import { createDeviceAdminHttpHandler } from "./device/admin-http.js";
 import { FirmwareVoiceBridge } from "./device/voice-bridge.js";
 import type { PersonDirectory } from "./identity/directory.js";
 import { loadPersonDirectoryFile } from "./identity/file-directory.js";
@@ -208,6 +209,8 @@ async function main(): Promise<void> {
   const deviceRegistry = await DeviceRegistry.open({
     filePath: deviceRegistryFile
   });
+  const deviceAdminToken =
+    process.env.NARA_DEVICE_ADMIN_TOKEN?.trim();
 
   const personalMemoryFile = process.env.NARA_PERSONAL_MEMORY_FILE;
   const memorySubjectId = process.env.NARA_MEMORY_SUBJECT_ID;
@@ -475,6 +478,15 @@ async function main(): Promise<void> {
         bearerToken: capsuleToken,
         recipientPersonId: capsuleRecipientId,
         subjectPersonId: capsuleSubjectId
+      })
+    );
+  }
+  if (deviceAdminToken) {
+    httpHandlers.push(
+      createDeviceAdminHttpHandler({
+        registry: deviceRegistry,
+        viewerGrants,
+        adminToken: deviceAdminToken
       })
     );
   }

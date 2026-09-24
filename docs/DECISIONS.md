@@ -307,3 +307,26 @@ Consequences:
 - private capsule content is allowed on production encrypted internal flash,
   but private removable-media content is forbidden until Nara has a distinct
   per-device removable-media key lifecycle.
+
+## 2026-09-24 — Device transfer is release then fresh claim
+
+**Status:** accepted
+
+Transferring a physical Nara between accounts does not mutate the owner field
+in place.
+
+The administrative release-for-transfer operation:
+
+- invalidates the existing per-device credential;
+- increments credential generation;
+- clears account/role binding;
+- cancels pending claim transactions;
+- revokes any temporary trusted-viewer grant;
+- returns the device to `unclaimed`.
+
+The recipient must then complete a **fresh** claim with account approval and
+physical approval. Permanent `revoked` devices cannot be released back into
+the claim pool.
+
+This prevents an old owner credential, old viewer grant or partially completed
+claim from surviving ownership transfer.

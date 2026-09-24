@@ -35,7 +35,7 @@ Real names, private biography, relationship details, credentials, recordings and
 - phone PCM framing and authorization-isolation integration tests;
 - phone bridge can use the phone OS audio route, including a TWS headset connected to the phone;
 - GitHub Releases-backed OTA catalog, stable/beta channel policy and device-authenticated OTA checks;
-- persistent device claim/credential lifecycle with hashed secrets, rotation and revocation;
+- persistent device claim/credential lifecycle with hashed secrets, rotation, permanent revocation and explicit release-for-transfer;
 - provider-neutral person directory and conservative speaker-identity decision service;
 - runtime speaker recognition integration that remains personalization evidence rather than private-memory authorization;
 - file-backed personal memory with validation, subject/viewer access policy, sharing, expiry, bounded recall, edit/delete, fail-closed persistence and optional AES-256-GCM keyring encryption at rest;
@@ -65,7 +65,7 @@ Real names, private biography, relationship details, credentials, recordings and
 - useful no-network startup: configured devices do not fall back into endless provisioning when known Wi-Fi is temporarily absent;
 - background saved-network scan/retry and automatic gateway recovery;
 - ESP-IDF Wi-Fi Easy Connect / DPP QR commissioning foundation on the Waveshare 1.85B target;
-- deliberate BOOT interaction for DPP commissioning/retry plus explicit fallback provisioning when the phone does not support DPP;
+- deliberate BOOT interaction for DPP commissioning/retry plus Espressif Network Provisioning BLE Security 2 fallback when the phone does not support DPP;
 - physical CST816S/QMI8658 bring-up and local interaction path;
 - CST816S touch-driven gaze plus deterministic tap, double-tap, hold and stroke/pet classification;
 - deterministic flip/shake/spin gesture classifier foundation;
@@ -140,7 +140,7 @@ When Internet/gateway access exists but the realtime voice WebSocket is closed, 
 
 A browser phone-audio bridge exists for an online/reachable Nara Gateway, but the production **ESP32-created secure SoftAP peer UI** is still a separate staged feature. Do not confuse those two paths.
 
-The inherited `78/esp-wifi-connect` configuration portal still uses an open SoftAP/plain HTTP model and must not be expanded into a private-data peer surface.
+The inherited `78/esp-wifi-connect` open SoftAP/plain-HTTP portal remains only for legacy/development board profiles and is disabled on the first Waveshare target. It must not be expanded into a private-data peer surface.
 
 ## Physical personality
 
@@ -209,7 +209,7 @@ Still staged:
 - local notes/messages/media beyond the implemented authorized capsule;
 - direct secure SoftAP peer UI on the ESP32;
 - a selected/calibrated local Indonesian STT/TTS model stack for the implemented chained voice contracts;
-- production secure BLE/SoftAP fallback provisioning and real-device DPP compatibility/power validation.
+- real-device DPP/BLE Security 2 compatibility, coexistence and power validation.
 
 Do not promise unrestricted Indonesian free-form STT/TTS on the ESP32-S3 alone. ESP-SR's supported command/TTS language limits still apply.
 
@@ -244,8 +244,8 @@ Remaining hardening is product/operations work:
 
 - browser-facing visual polish around the implemented passkey backup/revoke and device grant controls;
 - account recovery when every strong authenticator is lost remains an operator/original-identity-proofing flow rather than a weaker automatic factor;
-- transfer semantics between separate human accounts remain a deliberate administrative workflow;
-- hardware-in-the-loop validation of the physical unlock/relock flow.
+- browser-facing transfer/reset polish remains product UI work; the administrative release-for-transfer lifecycle is implemented and invalidates old device/viewer credentials;
+- hardware-in-the-loop validation of the physical unlock/relock and re-claim flow.
 
 ### P2 — isolated-device utility/capsule UX
 
@@ -259,16 +259,18 @@ stroke/pet browsing. Remaining product-layer work is optional enrichment:
 
 ### P3 — production commissioning/direct peer
 
-DPP QR commissioning is now implemented in firmware as the preferred standardized fast path where the phone supports Wi-Fi Easy Connect. The inherited open/plain-HTTP portal remains only an explicit fallback and must still be replaced/contained before private direct-peer data exists.
+DPP QR commissioning is implemented as the preferred standardized fast path.
+The first Waveshare target now uses Espressif Network Provisioning BLE Security
+2 (SRP6a + AES-256-GCM) as the explicit fallback and disables the inherited
+open SoftAP/plain-HTTP portal.
 
-Remaining production work:
+Remaining production work is now split cleanly:
 
-- validate DPP QR scanning, router compatibility, RF behavior and power on real phones/hardware;
-- add secure SoftAP or ESP-IDF provisioning Security 2 as the universal fallback;
-- application/session authorization;
-- explicit physical activation;
-- short-lived credentials;
-- measured BLE lifecycle.
+- hardware: validate DPP QR scanning, BLE provisioning apps, RF coexistence,
+  reconnect behavior and power on real phones/hardware;
+- optional future direct-peer/private SoftAP UI: define its own application
+  authorization, explicit physical activation and short-lived session
+  credentials rather than reusing provisioning security as content security.
 
 ### P4 — optional ecosystem expansion
 
